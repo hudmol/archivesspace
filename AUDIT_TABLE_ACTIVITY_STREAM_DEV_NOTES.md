@@ -74,6 +74,8 @@ backend/app/model/enumeration.rb
 backend/app/model/mixins/relationships.rb
 backend/app/model/mixins/tree_nodes.rb
 backend/app/model/top_container.rb
+backend/app/lib/component_transfer.rb
+backend/app/model/ASModel_transfers.rb
 ```
 Each call to `AuditEvent#log_event` will result in zero or one rows being
 inserted into `audit_event` and, if an event is inserted, then one or more
@@ -83,19 +85,6 @@ When an event is logged, its `change_method` is passed via the `RequestContext`.
 When the request originates from the staff ui, the change method is passed to
 the backend via a header called `HTTP_X_ARCHIVESSPACE_CHANGE_METHOD` and then
 placed in the `RequestContext`.
-
-NOTE: There is a known gap in audit logging. There are various transfer
-endpoints on the ArchivesSpace API:
-```
-/repositories/:repo_id/accessions/:id/transfer
-/repositories/:repo_id/component_transfers
-/repositories/:repo_id/digital_objects/:id/transfer
-/repositories/:repo_id/resources/:id/transfer
-/repositories/:repo_id/transfer
-```
-These endpoints cause records to be transfered (`move` in Activity Stream
-speak) between Repository of Resource records. Currently these events will be
-logged as regular `update`s. We will implement this soon.
 
 
 ## Pagination and activity storage
