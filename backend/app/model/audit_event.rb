@@ -132,6 +132,10 @@ class AuditEvent
     object_type_codes.map{|otc| AuditEvent::OBJECT_TYPE_CODE_TABLE[otc]}
   end
 
+  def self.object_type_code_for(type)
+    AuditEvent::OBJECT_TYPE_CODE_TABLE.invert.fetch(type, nil)
+  end
+
   def self.all_activity_streams
     object_types.map{|ot| activity_stream_uri("/#{ot}")}
   end
@@ -209,6 +213,7 @@ class AuditEvent
         record_type = AuditEvent::OBJECT_TYPE_CODE_TABLE.fetch(audit_page.page.fetch(:bulk_record_type))
         record_ids = audit_page.event_ids
 
+        # {id: {role: uri}
         record_uris = DB.open do |db|
           model = ASModel.all_models.find {|model|
             jsonmodel = model.my_jsonmodel(true)
@@ -217,18 +222,23 @@ class AuditEvent
 
           raise "Model not found for #{record_type}" unless model
 
-          model.any_repo.filter(id: record_ids).map {|record|
-            if record.respond_to?(:repo_id)
-              RequestContext.open(repo_id: record.repo_id) do
-                [record.id, record.uri]
+          if audit_page.page[:bulk_object_repo_id]
+            record_ids.map {|record_id|
+              [record_id, {AuditEvent::ROLE_OBJECT => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_object_repo_id]),
+                           AuditEvent::ROLE_TARGET => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_target_repo_id])}]
+            }.to_h
+          else
+            model.any_repo.filter(id: record_ids).map {|record|
+              if record.respond_to?(:repo_id)
+                RequestContext.open(repo_id: record.repo_id) do
+                  [record.id, {AuditEvent::ROLE_OBJECT => record.uri}]
+                end
+              else
+                [record.id, {AuditEvent::ROLE_OBJECT => record.uri}]
               end
-            else
-              [record.id, record.uri]
-            end
-          }.to_h
+            }.to_h
+          end
         end
-
-        role = AuditEvent::ROLE_OBJECT
 
         out[:orderedItems] = record_ids.each_with_index.map {|record_id, offset|
           {
@@ -238,7 +248,7 @@ class AuditEvent
             change_method: audit_page.page.fetch(:bulk_change_method),
             actor_name: audit_page.page.fetch(:bulk_actor_name),
             actor_type: audit_page.page.fetch(:bulk_actor_type),
-            records:[role, record_type, record_uris.fetch(record_id)].join(":")
+            records: record_uris.fetch(record_id).map{|role, uri| [role, record_type, uri].join(':')}.join(',')
           }
         }.map {|row| render(row, include_context: false)}
 

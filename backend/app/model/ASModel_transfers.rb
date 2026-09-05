@@ -96,21 +96,15 @@ module ASModel
           # One delete marker per URI
           if self.has_jsonmodel?
             jsonmodel = self.my_jsonmodel
-            RequestContext.open(:change_method => AuditEvent::CHANGE_METHOD_TRANSFER) do
-              self.filter(:repo_id => source_repository.id).select(:id).each do |row|
-                source_uri = jsonmodel.uri_for(row[:id], repo_id: source_repository.id)
-                target_uri = jsonmodel.uri_for(row[:id], repo_id: target_repository.id)
-
-                Tombstone.filter(uri: target_uri).delete
-                Tombstone.create(uri: source_uri)
-
-                # while we're walking through all the ids, create audit log events
-                AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_MOVE,
-                                     AuditEvent::ROLE_OBJECT => source_uri,
-                                     AuditEvent::ROLE_TARGET => target_uri)
-              end
+            self.filter(:repo_id => source_repository.id).select(:id).each do |row|
+              Tombstone.filter(uri: jsonmodel.uri_for(row[:id], repo_id: target_repository.id)).delete
+              Tombstone.create(uri: jsonmodel.uri_for(row[:id], repo_id: source_repository.id))
             end
           end
+
+          # We have to log the audit events before updating because afterwards we can't
+          # reliably select the affected records
+          AuditPaginator.log_bulk_transfer(self, source_repository.id, target_repository.id)
 
           self.filter(:repo_id => source_repository.id).
                update(:repo_id => target_repository.id,

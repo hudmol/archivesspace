@@ -69,7 +69,7 @@ class AuditPaginator
     AuditPage.new(requested_page, has_next_page)
   end
 
-  BulkIDConsumer = Struct.new(:timestamp, :record_type, :record_type_code, :activity_type, :change_method, :actor_type, :actor_name) do
+  BulkIDConsumer = Struct.new(:timestamp, :record_type, :record_type_code, :activity_type, :change_method, :actor_type, :actor_name, :object_repo, :target_repo) do
     def initialize(*)
       super
 
@@ -143,6 +143,8 @@ class AuditPaginator
                   bulk_change_method: self.change_method,
                   bulk_actor_type: self.actor_type,
                   bulk_actor_name: self.actor_name,
+                  bulk_object_repo_id: self.object_repo,
+                  bulk_target_repo_id: self.target_repo,
 
                   # Note: requirement that we process ANY_TYPE first because we
                   # depend on its page for subsequent inserts.
@@ -160,7 +162,7 @@ class AuditPaginator
     end
   end
 
-  def self.add_bulk_events(timestamp:, record_type:, activity_type:, change_method:, actor_type:, actor_name:)
+  def self.add_bulk_events(timestamp:, record_type:, activity_type:, change_method:, actor_type:, actor_name:, object_repo:, target_repo:)
     unless AuditEvent::OBJECT_TYPE_CODE_TABLE.has_key?(record_type)
       raise "Unsupported audit event record type: #{record_type}"
     end
@@ -183,7 +185,9 @@ class AuditPaginator
                                      activity_type,
                                      change_method,
                                      actor_type,
-                                     actor_name)
+                                     actor_name,
+                                     object_repo,
+                                     target_repo)
     id_consumer.transaction do
       yield id_consumer
       id_consumer.flush(:force)
@@ -221,6 +225,39 @@ class AuditPaginator
         end
       end
     end
+  end
+
+  def self.log_bulk_transfer(model, source_repo_id, target_repo_id)
+    now = Time.now
+
+    jsonmodel_cls = model.my_jsonmodel(true)
+    return unless jsonmodel_cls
+
+    record_type_code = AuditEvent.object_type_code_for(jsonmodel_cls.record_type)
+    return unless record_type_code
+
+    AuditPaginator.add_bulk_events(
+                                   timestamp: now,
+                                   record_type: record_type_code,
+                                   activity_type: AuditEvent::ACTIVITY_TYPE_MOVE,
+                                   change_method: AuditEvent::CHANGE_METHOD_TRANSFER,
+                                   actor_type: AuditEvent::ACTOR_TYPE_PERSON,
+                                   actor_name: RequestContext.get(:current_username),
+                                   object_repo: source_repo_id,
+                                   target_repo: target_repo_id
+                                   ) do |events|
+      begin
+        model.filter(:repo_id => source_repo_id).map(:id).each do |record_id|
+          events << record_id
+        end
+      rescue
+        Log.error("Failure generating transfer move events for type #{jsonmodel_cls.record_type}: #{$!}")
+        Log.exception($!)
+      end
+    end
+
+
+
   end
 
   private
@@ -336,7 +373,9 @@ class AuditPaginator
                 bulk_activity_type: 0,
                 bulk_change_method: 0,
                 bulk_actor_type: 0,
-                bulk_actor_name: ''
+                bulk_actor_name: '',
+                bulk_object_repo_id: nil,
+                bulk_target_repo_id: nil,
 
               )
             )
