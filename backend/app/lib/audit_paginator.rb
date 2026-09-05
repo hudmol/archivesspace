@@ -228,6 +228,8 @@ class AuditPaginator
   end
 
   def self.log_bulk_transfer(model, source_repo_id, target_repo_id)
+    return unless AppConfig[:enable_audit_logging]
+
     now = Time.now
 
     jsonmodel_cls = model.my_jsonmodel(true)
