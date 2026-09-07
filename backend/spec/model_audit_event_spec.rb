@@ -41,8 +41,7 @@ describe 'AuditEvent model' do
     allow(AppConfig).to receive(:[]).and_call_original
     allow(AppConfig).to receive(:[]).with(:enable_audit_logging).and_return(true)
 
-    # FIXME: accession doesn't seem to be working here
-    allow(AppConfig).to receive(:[]).with(:audit_logging_include_object_types).and_return(['accession', 'resource'])
+    allow(AppConfig).to receive(:[]).with(:audit_logging_include_object_types).and_return(['accession', 'assessment'])
   end
 
   def reset_audit_tables
@@ -58,7 +57,9 @@ describe 'AuditEvent model' do
                                    :activity_type => AuditEvent::ACTIVITY_TYPE_UPDATE,
                                    :change_method => AuditEvent::CHANGE_METHOD_BULK,
                                    :actor_type => AuditEvent::ACTOR_TYPE_PERSON,
-                                   :actor_name => actor_name) do |consumer|
+                                   :actor_name => actor_name,
+                                   :object_repo => nil,
+                                   :target_repo => nil) do |consumer|
       top_container_ids.each do |id|
         consumer << id
       end
@@ -68,10 +69,28 @@ describe 'AuditEvent model' do
   before(:each) do
     enable_audit_logging
     @resource = create(:json_resource)
+    @another_resource = create(:json_resource)
     @accession = create(:json_accession)
   end
 
-  it 'marks merge events when the target is included in the moved objects' do
+  it 'marks merge events when there are multiple objects and the target is one of them' do
+    rendered = AuditEvent.render({
+                                   :timestamp => Time.utc(2024, 1, 1, 10, 0, 0),
+                                   :actor_name => 'admin',
+                                   :actor_type => AuditEvent::ACTOR_TYPE_PERSON,
+                                   :activity_type => AuditEvent::ACTIVITY_TYPE_MOVE,
+                                   :change_method => AuditEvent::CHANGE_METHOD_API,
+                                   :records => "#{AuditEvent::ROLE_OBJECT}:resource:#{@resource.uri}," \
+                                               "#{AuditEvent::ROLE_OBJECT}:resource:#{@another_resource.uri}," \
+                                               "#{AuditEvent::ROLE_TARGET}:resource:#{@resource.uri}"
+                                 })
+
+    expect(rendered[:type]).to eq('Move')
+    expect(rendered[:summary]).to eq('merge')
+    expect(rendered['target'][:id]).to eq(AuditEvent.archivesspace_uri(@resource.uri))
+  end
+
+  it 'does not mark a move as a merge when there is only one object, even though the target is the same' do
     rendered = AuditEvent.render({
                                    :timestamp => Time.utc(2024, 1, 1, 10, 0, 0),
                                    :actor_name => 'admin',
@@ -83,7 +102,7 @@ describe 'AuditEvent model' do
                                  })
 
     expect(rendered[:type]).to eq('Move')
-    expect(rendered[:summary]).to eq('merge')
+    expect(rendered[:summary]).to be_nil
     expect(rendered['target'][:id]).to eq(AuditEvent.archivesspace_uri(@resource.uri))
   end
 

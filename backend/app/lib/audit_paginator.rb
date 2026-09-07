@@ -212,7 +212,9 @@ class AuditPaginator
           activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
           change_method: AuditEvent::CHANGE_METHOD_MIGRATION,
           actor_type: AuditEvent::ACTOR_TYPE_APPLICATION,
-          actor_name: 'admin'
+          actor_name: 'admin',
+          object_repo: nil,
+          target_repo: nil
         ) do |events|
           begin
             model.map(:id).each do |record_id|
