@@ -88,7 +88,10 @@ module ASModel
 
       def handle_suppressed(ids, val)
         if suppressible?
-          ASModel.update_suppressed_flag(self.filter(:id => ids), val)
+          dataset = self.filter(:id => ids)
+          ASModel.update_suppressed_flag(dataset, val)
+
+          AuditPaginator.log_bulk_update(self, dataset.select_map(:id))
         end
       end
 
@@ -99,7 +102,10 @@ module ASModel
 
 
       def handle_publish_flag(ids, val)
-        ASModel.update_publish_flag(self.filter(:id => ids), val)
+        dataset = self.filter(:id => ids)
+        ASModel.update_publish_flag(dataset, val)
+
+        AuditPaginator.log_bulk_update(self, dataset.select_map(:id))
       end
 
 

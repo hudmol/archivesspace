@@ -9,6 +9,10 @@ class AuditPaginator
 
   PAGE_SIZE = 500
 
+  # Given the choice, make bulk events if there are this many records or more
+  # Otherwise or just make individual events
+  BULK_OPTIMIZATION_THRESHOLD = 50
+
   def self.start
     @thread ||= Thread.new do
       AuditPaginator.new.run
@@ -171,7 +175,7 @@ class AuditPaginator
       raise "Unknown audit event activity type: #{activity_type}"
     end
 
-    unless AuditEvent::CHANGE_METHODS.include?(change_method)
+    unless AuditEvent::CHANGE_METHODS.include?(change_method.to_i)
       raise "Unknown audit event change method: #{change_method}"
     end
 
@@ -259,10 +263,54 @@ class AuditPaginator
         Log.exception($!)
       end
     end
-
-
-
   end
+
+  def self.log_bulk_update(model, record_ids)
+    return unless AppConfig[:enable_audit_logging]
+
+    now = Time.now
+
+    jsonmodel_cls = model.my_jsonmodel(true)
+    return unless jsonmodel_cls
+
+    record_type_code = AuditEvent.object_type_code_for(jsonmodel_cls.record_type)
+    return unless record_type_code
+
+    if record_ids.length > BULK_OPTIMIZATION_THRESHOLD
+      AuditPaginator.add_bulk_events(
+                                     timestamp: now,
+                                     record_type: record_type_code,
+                                     activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
+                                     change_method: RequestContext.get(:change_method) || AuditEvent::CHANGE_METHOD_API,
+                                     actor_type: AuditEvent::ACTOR_TYPE_PERSON,
+                                     actor_name: RequestContext.get(:current_username),
+                                     object_repo: nil,
+                                     target_repo: nil,
+                                     ) do |events|
+        begin
+          record_ids.each do |record_id|
+            events << record_id
+          end
+        rescue
+          Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
+          Log.exception($!)
+        end
+      end
+    else
+      model.any_repo.filter(id: record_ids).map do |record|
+        if record.respond_to?(:repo_id)
+          RequestContext.open(repo_id: record.repo_id) do
+            AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                                 AuditEvent::ROLE_OBJECT => record.uri)
+          end
+        else
+          AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                               AuditEvent::ROLE_OBJECT => record.uri)
+        end
+      end
+    end
+  end
+
 
   private
 
