@@ -79,19 +79,21 @@ module Lib
         # Set publish to false to create a new unpublished resource
         resource_source_json_model.publish = false
 
-        begin
-          @resource = ::Resource.create_from_json(resource_source_json_model)
-        rescue Sequel::ValidationFailed => e
-          @errors.push({ error: I18n.t('resource_duplicate_job.resource_failure_message', resource_id: @resource_id, message: e.message) })
+        RequestContext.open(:current_username => resource_source_json_model.created_by) do
+          begin
+            @resource = ::Resource.create_from_json(resource_source_json_model)
+          rescue Sequel::ValidationFailed => e
+            @errors.push({ error: I18n.t('resource_duplicate_job.resource_failure_message', resource_id: @resource_id, message: e.message) })
 
-          return false
+            return false
+          end
+
+          archival_objects = resource_source.children.to_a
+
+          return true if archival_objects.count == 0
+
+          duplicate_archival_objects(archival_objects, nil)
         end
-
-        archival_objects = resource_source.children.to_a
-
-        return true if archival_objects.count == 0
-
-        duplicate_archival_objects(archival_objects, nil)
       end
 
       # Recursively parse and create archival objects from top to bottom.
