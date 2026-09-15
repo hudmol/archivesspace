@@ -7,6 +7,9 @@ class AuditPaginator
 
   ANY_TYPE = '_all'
 
+  # We'll aim to buffer this many rows before actually inserting unless forced
+  ROW_BUFFER_COUNT = 256
+
   PAGE_SIZE = 500
 
   # Given the choice, make bulk events if there are this many records or more
@@ -79,15 +82,27 @@ class AuditPaginator
 
       @id_set = RoaringBitmap.new
       @inside_transaction = false
+      @buffered_pages = {}
+      @max_allowed_packet = nil
     end
 
     def transaction
-      DB.open do |_db|
+      DB.open do |db|
+        AuditPaginator.lock_page_table!(db)
         @inside_transaction = true
+
+        @max_allowed_packet = db.fetch("select @@max_allowed_packet as max_packet").first[:max_packet].to_i
+
+        if @max_allowed_packet == 0
+          # Assume a fairly conservative value
+          @max_allowed_packet = 4 * 1024 * 1024
+        end
+
         begin
           yield
         rescue
           @inside_transaction = false
+          raise $!
         end
       end
     end
@@ -100,6 +115,7 @@ class AuditPaginator
     def flush(force = false)
       raise "AuditPaginator: no transaction" unless @inside_transaction
 
+      # Prepare a new page if there's one to prepare
       if @id_set.cardinality == AuditPaginator::PAGE_SIZE || (@id_set.cardinality > 0 && force)
         @id_set.run_optimize
 
@@ -110,8 +126,6 @@ class AuditPaginator
 
           # DB.open just to get the handle: we're already in an outer transaction
           DB.open do |db|
-            AuditPaginator.lock_page_table!(db)
-
             # If there is a page in progress, we want to close it off.  Our
             # events will be next in the activity stream.
             db[:audit_page].filter(filters).filter(is_page_complete: 0).update(is_page_complete: 1)
@@ -129,40 +143,63 @@ class AuditPaginator
                                              0
                                            end
 
+            # If we have buffered pages not yet written, adjust our numbers to include those too
+            last_page += @buffered_pages.fetch(filters, []).length
+            cumulative_prior_event_count += @buffered_pages.fetch(filters, []).map {|page| page[:event_count]}.sum
+
             new_pages[type_limit] = last_page + 1
 
-            db[:audit_page]
-              .insert(
-                filters.merge(
-                  page_event_type: 'bulk',
-                  page_number: last_page + 1,
-                  update_time: self.timestamp,
-                  last_id_written: -1,
-                  is_page_complete: 1,
-                  event_count: @id_set.cardinality,
-                  cumulative_prior_event_count: cumulative_prior_event_count,
-                  id_set: AuditPaginator.id_set_to_bytes(@id_set),
-                  bulk_record_type: self.record_type_code,
-                  bulk_activity_type: self.activity_type,
-                  bulk_change_method: self.change_method,
-                  bulk_actor_type: self.actor_type,
-                  bulk_actor_name: self.actor_name,
-                  bulk_object_repo_id: self.object_repo,
-                  bulk_target_repo_id: self.target_repo,
+            @buffered_pages[filters] ||= []
+            @buffered_pages[filters] << filters.merge(
+              page_event_type: 'bulk',
+              page_number: last_page + 1,
+              update_time: self.timestamp,
+              last_id_written: -1,
+              is_page_complete: 1,
+              event_count: @id_set.cardinality,
+              cumulative_prior_event_count: cumulative_prior_event_count,
+              id_set: AuditPaginator.id_set_to_bytes(@id_set),
+              bulk_record_type: self.record_type_code,
+              bulk_activity_type: self.activity_type,
+              bulk_change_method: self.change_method,
+              bulk_actor_type: self.actor_type,
+              bulk_actor_name: self.actor_name,
+              bulk_object_repo_id: self.object_repo,
+              bulk_target_repo_id: self.target_repo,
 
-                  # Note: requirement that we process ANY_TYPE first because we
-                  # depend on its page for subsequent inserts.
-                  bulk_all_stream_page_number: new_pages.fetch(ANY_TYPE)
-                )
-              )
-
-            Log.info("Audit page #{last_page + 1} of #{@id_set.cardinality} bulk events inserted for type #{record_type}")
+              # Note: requirement that we process ANY_TYPE first because we
+              # depend on its page for subsequent inserts.
+              bulk_all_stream_page_number: new_pages.fetch(ANY_TYPE)
+            )
           end
         end
-
         @id_set.clear
       end
 
+      # And write to the DB if we're ready to write
+      [ANY_TYPE, record_type].each do |type_limit|
+        filters = { page_filter: type_limit }
+
+        pages_to_write = @buffered_pages.fetch(filters, [])
+        next if pages_to_write.empty?
+
+        estimated_packet_size = pages_to_write.map {|page| page.values.map {|field| field.to_s.bytesize }.sum }.sum
+        nearing_max_packet = (estimated_packet_size.to_f / @max_allowed_packet.to_f) >= 0.8
+
+        if (force && pages_to_write.length > 0) ||
+           pages_to_write.length >= ROW_BUFFER_COUNT ||
+           nearing_max_packet
+          DB.open do |db|
+            db[:audit_page].multi_insert(@buffered_pages.fetch(filters))
+          end
+
+          @buffered_pages.fetch(filters).each do |page|
+            Log.info("Audit page #{page.fetch(:page_number)} of #{page.fetch(:event_count)} bulk events inserted for type #{record_type}")
+          end
+
+          @buffered_pages.fetch(filters).clear
+        end
+      end
     end
   end
 
@@ -227,6 +264,7 @@ class AuditPaginator
           rescue
             Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
             Log.exception($!)
+            raise $!
           end
         end
       end
