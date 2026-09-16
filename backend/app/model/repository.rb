@@ -210,6 +210,10 @@ class Repository < Sequel::Model(:repository)
     end
     self.class.dataset.filter( id: self.id ).update( position: target_position, system_mtime: Time.now )
     self.class.dataset.filter( id: sibling.id ).update( position: current_position, system_mtime: Time.now ) if sibling
+
+    AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                         AuditEvent::ROLE_OBJECT => self.uri)
+
     target_position
   end
 end
