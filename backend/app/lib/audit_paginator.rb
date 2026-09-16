@@ -258,7 +258,7 @@ class AuditPaginator
           target_repo: nil
         ) do |events|
           begin
-            model.map(:id).each do |record_id|
+            model.select(:id).map(:id).each do |record_id|
               events << record_id
             end
           rescue
