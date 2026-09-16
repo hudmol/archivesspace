@@ -9,7 +9,11 @@ module ComponentsAddChildren
   end
 
   def add_children(children)
-    RequestContext.put(:change_method, AuditEvent::CHANGE_METHOD_RAPID);
+    # If change_method is already set then we've come from the frontend and hence rapid data entry
+    # so change it to rapid. Otherwise we've come directly from an API call so let is default to API
+    if RequestContext.get(:change_method)
+      RequestContext.put(:change_method, AuditEvent::CHANGE_METHOD_RAPID);
+    end
 
     children.children.each do |child|
       obj = JSONModel(self.class.node_record_type.intern).from_hash(child)
