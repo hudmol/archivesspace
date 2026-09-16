@@ -332,6 +332,10 @@ class ArchivesSpaceService < Sinatra::Base
 
       if user && user.is_system_user == 0
         user.update( :is_active_user => 1 )
+
+        AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                             AuditEvent::ROLE_OBJECT => user.uri)
+
         json = User.to_jsonmodel(user)
         json.permissions = user.permissions
         json_response(json)
@@ -350,6 +354,10 @@ class ArchivesSpaceService < Sinatra::Base
 
      if user && user.is_system_user == 0
        user.update( :is_active_user => 0 )
+
+       AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                            AuditEvent::ROLE_OBJECT => user.uri)
+
        json = User.to_jsonmodel(user)
        json.permissions = user.permissions
        json_response(json)
