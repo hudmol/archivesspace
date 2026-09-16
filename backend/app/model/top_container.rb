@@ -350,10 +350,9 @@ class TopContainer < Sequel::Model(:top_container)
                                 :user_mtime => now
                               })
         end
-
-        log_audit_event_for_batch(ids)
-
       end
+
+      log_audit_event_for_batch(ids)
 
       TopContainer.update_mtime_for_ids(ids)
 
