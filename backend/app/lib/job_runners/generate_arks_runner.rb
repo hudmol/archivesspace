@@ -14,7 +14,7 @@ class GenerateArksRunner < JobRunner
     end
 
     Repository.each do |repo|
-      RequestContext.open(:repo_id => repo.id) do
+      RequestContext.open(:repo_id => repo.id, :current_username => @json['last_modified_by']) do
         ASModel.all_models.select {|model| model.included_modules.include?(Arks)}.each do |model|
 
           underlined_msg("Repository #{repo.repo_code}: Generating ARKs for #{model} records")
@@ -45,6 +45,8 @@ class GenerateArksRunner < JobRunner
               end
 
               model.update_mtime_for_ids(records_to_reindex)
+
+              AuditPaginator.log_bulk_update(model, records_to_reindex)
             end
           end
 

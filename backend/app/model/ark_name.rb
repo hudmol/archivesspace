@@ -205,6 +205,9 @@ class ArkName < Sequel::Model(:ark_name)
 
     obj.class.update_mtime_for_ids([obj.id])
 
+    AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                         AuditEvent::ROLE_OBJECT => obj.uri)
+
     true
   end
 
