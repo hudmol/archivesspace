@@ -2433,6 +2433,8 @@ en:
       rating: Rating
       values: Values
       user_agent_ref: User
+      resource_ref: Resource
+      repository_ref: Repository
     formats:
       json: JSON
       csv: CSV
