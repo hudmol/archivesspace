@@ -1,0 +1,36 @@
+<div class="form-group required">
+  <div class="input-group linker-wrapper">
+    <input type="text" class="linker"
+           id="report_user_linker"
+           data-label_browse="Browse Users"
+           data-label_link="Select User"
+           data-path="<%= form.path %>"
+           data-name="user_agent_ref"
+           data-url="<%= url_for :controller => :search, :action => :do_search, :format => :json %>"
+           data-browse-url="<%= url_for :controller => :search, :action => :do_search, :format => :js %>"
+           data-selected="[]"
+           data-format_property="display_string"
+           data-multiplicity="one"
+           data-types='["agent_with_user"]'
+           aria-label="Select user to report on"
+      />
+
+    <div class="input-group-append">
+      <button
+        type="button"
+        class="btn btn-default dropdown-toggle"
+        data-toggle="dropdown"
+        aria-expanded="false"
+        aria-label="Select user to report on"
+      ></button>
+      <ul class="dropdown-menu">
+        <li>
+          <button
+            type="button"
+            class="btn btn-sm rounded-0 dropdown-item linker-browse-btn"
+          ><%= t("actions.browse") %></button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

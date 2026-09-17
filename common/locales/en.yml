@@ -2432,6 +2432,7 @@ en:
       template: Template
       rating: Rating
       values: Values
+      user_agent_ref: User
     formats:
       json: JSON
       csv: CSV
