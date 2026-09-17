@@ -1,0 +1,6 @@
+en:
+  reports:
+    user_based_audit_event_report:
+      title: Audit Events by User
+      description: Report on audit events by a specific user within a date range
+      identifier_prefix: AuditEventUserBased
