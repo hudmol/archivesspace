@@ -65,6 +65,14 @@ class AbstractReport
     raise 'Please specify a query string to return your reportable results'
   end
 
+  def override_generate?
+    false
+  end
+
+  def handle_generate(file)
+    raise 'Handle streaming to the file yourself (N.B. requires format = `custom`)'
+  end
+
   def fix_row(row); end
 
   def after_tasks; end

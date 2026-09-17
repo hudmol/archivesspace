@@ -17,17 +17,21 @@ class ReportGenerator
   end
 
   def generate(file)
-    case (report.format)
-    when 'json'
-      generate_json(file)
-    when 'html'
-      generate_html(file)
-    when 'pdf'
-      generate_pdf(file)
-    when 'rtf'
-      generate_rtf(file)
+    if report.override_generate?
+      report.handle_generate(file)
     else
-      generate_csv(file)
+      case (report.format)
+      when 'json'
+        generate_json(file)
+      when 'html'
+        generate_html(file)
+      when 'pdf'
+        generate_pdf(file)
+      when 'rtf'
+        generate_rtf(file)
+      else
+        generate_csv(file)
+      end
     end
   end
 

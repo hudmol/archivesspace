@@ -125,25 +125,43 @@
 
 <% @report_data['reports'].each do |code, report| %>
   <% define_template(code, jsonmodel_definition(:report_job)) do |form| %>
+    <div class="report-form-<%= code.gsub('_', '-') %>">
+      <% report_params = report["params"].reject{|p| ["format", "repo_id"].include?(p[0])} %>
 
-    <% report_params = report["params"].reject{|p| ["format", "repo_id"].include?(p[0])} %>
-
-    <% report_params.each do | param | %>
-      <div class="form-group w-100 row">
-        <label class="col-sm-2 control-label text-md-right"><%= t("reports.parameters.#{param[0]}", :default => param[0]) %></label>
-        <div class="col-sm-9">
-          <% if param[1] === "Date" %>
-            <%= form.textfield param[0], nil,  :class => 'date-field form-control', :'data-format' => 'yyyy-mm-dd', :placeholder => 'yyyy-mm-dd', :"data-label" => t("actions.date_picker_toggle") %>
-          <% elsif param[1] === "Boolean" %>
-            <%= form.checkbox param[0] %>
-          <% else %>
-            <%# Custom types will be rendered using a partial with the corresponding name %>
-            <%= render_aspace_partial :partial => "jobs/report_partials/#{param[1].downcase}", :locals => {:object => @job, :form => form, :name => param[0]} %>
-          <% end %>
+      <% report_params.each do | param | %>
+        <div class="form-group w-100 row">
+          <label class="col-sm-2 control-label text-md-right"><%= t("reports.parameters.#{param[0]}", :default => param[0]) %></label>
+          <div class="col-sm-9">
+            <% if param[1] === "Date" %>
+              <%= form.textfield param[0], nil,  :class => 'date-field form-control', :'data-format' => 'yyyy-mm-dd', :placeholder => 'yyyy-mm-dd', :"data-label" => t("actions.date_picker_toggle") %>
+            <% elsif param[1] === "Boolean" %>
+              <%= form.checkbox param[0] %>
+            <% else %>
+              <%# Custom types will be rendered using a partial with the corresponding name %>
+              <%= render_aspace_partial :partial => "jobs/report_partials/#{param[1].downcase}", :locals => {:object => @job, :form => form, :name => param[0]} %>
+            <% end %>
+          </div>
         </div>
-      </div>
-    <% end %>
+      <% end %>
 
+      <div id="format">
+        <div class="form-group w-100 row">
+          <label class="col-sm-2 control-label text-right"><%= t("reports.format") %></label>
+          <div class="col-sm-9 checkbox">
+            <% formats = report['formats'] || @report_data["formats"] || %w{ json csv html pdf } %>
+            <%= select_tag('job[format]', options_for_select(formats.map{|f| [I18n.t("reports.formats.#{f}", :default => f), f]}), {:id => 'job_format_', :class => 'form-control'}) %>
+          </div>
+        </div>
+        <% unless report['suppress_csv_options'] %>
+          <div class="form-group w-100 row csv_options" style="display: none;">
+            <label class="col-sm-2 control-label text-right"><%= t("reports.linked_records_in_json") %></label>
+            <div class="col-sm-9 checkbox">
+              <%= check_box_tag("job[job_params][csv_show_json]") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
   <% end %>
 <% end %>
 
@@ -186,17 +204,6 @@
 
   <div id="report-fields">
     <%# template for selected report type is rendered here %>
-  </div>
-
-  <div id="format">
-    <% formats = @report_data["formats"] || %w{ json csv html pdf } %>
-    <%= form.label_and_select :format, formats.collect{|format| [t("reports.formats.#{format}", :default => format), format]} %>
-    <div class="form-group w-100 row csv_options">
-      <label class="col-sm-2 control-label text-right"><%= t("reports.linked_records_in_json") %></label>
-      <div class="col-sm-9 checkbox">
-        <%= check_box_tag("job[job_params][csv_show_json]") %>
-      </div>
-    </div>
   </div>
 
 <% end %>

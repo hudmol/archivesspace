@@ -37,17 +37,6 @@ var init = function () {
       locationReportSubFormChange
     );
 
-    var formatChange = function () {
-      if ($('#job_format_').val() == 'csv') {
-        $('.csv_options').show();
-      } else {
-        $('.csv_options').hide();
-      }
-    };
-
-    formatChange();
-    $(document).on('change', '#job_format_', formatChange);
-
     var initListing = function (report) {
       $('#report-fields').html(
         AS.renderTemplate('template_' + report, {
@@ -58,6 +47,20 @@ var init = function () {
       if (report == 'location_holdings_report') {
         locationReportSubFormChange();
       }
+      var formatChange = function () {
+        if ($('#job_format_').val() == 'csv') {
+          $('.csv_options').show();
+        } else {
+          $('.csv_options').hide();
+        }
+      };
+
+      formatChange();
+
+      $('#report-fields #job_format_').on('change', function () {
+        formatChange();
+      });
+
       $(document).triggerHandler('subrecordcreated.aspace', [
         report,
         $('#report-fields'),
