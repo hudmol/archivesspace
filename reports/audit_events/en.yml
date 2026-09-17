@@ -1,6 +1,20 @@
 en:
   reports:
     user_based_audit_event_report:
-      title: Audit Events by User
+      title: Audit Events - By User
       description: Report on audit events by a specific user within a date range
       identifier_prefix: AuditEventUserBased
+    delete_merge_transfer_audit_event_report:
+      title: Audit Events - Delete, Merge, Transfer
+      description: Report on delete, merge, and transfer audit events within a date range for a specific object type
+      identifier_prefix: AuditEventDeleteMergeTransfer
+    resource_audit_event_report:
+      title: Audit Events - By Collection/Resource
+      description: Report on audit events by a specific resource within a date range
+      identifier_prefix: AuditEventResource
+    repository_audit_event_report:
+      title: Audit Events - By Repository
+      description: Report on audit events by a specific repository within a date range
+      identifier_prefix: AuditEventRepository
+    parameters:
+      object_type: Object Type
