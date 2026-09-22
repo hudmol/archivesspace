@@ -257,6 +257,7 @@ describe 'AuditEvent model' do
     it 'does not log when audit logging is disabled' do
       allow(AppConfig).to receive(:[]).and_call_original
       allow(AppConfig).to receive(:[]).with(:enable_audit_logging).and_return(false)
+      allow(AppConfig).to receive(:[]).with(:audit_logging_include_object_types).and_return(['accession', 'assessment'])
 
       expect {
         AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_CREATE,
@@ -301,6 +302,10 @@ describe 'AuditEvent model' do
       allow(Log).to receive(:warn)
       allow(Log).to receive(:debug)
 
+      allow(AppConfig).to receive(:[]).and_call_original
+      allow(AppConfig).to receive(:[]).with(:enable_audit_logging).and_return(true)
+      allow(AppConfig).to receive(:[]).with(:audit_logging_include_object_types).and_return(['accession', 'assessment'])
+
       expect {
         AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
                              {AuditEvent::ROLE_OBJECT => ['not-a-uri', '/users/1', @resource.uri]},
@@ -321,6 +326,10 @@ describe 'AuditEvent model' do
     it 'does not log when every parsed record is discarded' do
       allow(Log).to receive(:warn)
       allow(Log).to receive(:debug)
+
+      allow(AppConfig).to receive(:[]).and_call_original
+      allow(AppConfig).to receive(:[]).with(:enable_audit_logging).and_return(true)
+      allow(AppConfig).to receive(:[]).with(:audit_logging_include_object_types).and_return(['accession', 'assessment'])
 
       expect {
         AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
