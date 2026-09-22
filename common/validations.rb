@@ -124,7 +124,8 @@ module JSONModel::Validations
 
   def self.check_name(hash)
     errors = []
-    errors << ["sort_name", "Property is required but was missing"] if hash["sort_name"].nil? and !hash["sort_name_auto_generate"]
+    errors << ["sort_name", "Property is required but was missing"] if hash["sort_name"].nil? and hash["sort_name_auto_generate"] == false
+
     errors
   end
 
