@@ -22,7 +22,8 @@ class ArchivesSpaceService < Sinatra::Base
     .description("Get a page of the activity stream")
     .permissions([])
     .params(["page", Integer, "The page to get"])
-    .returns([200, "an OrderedCollectionPage"]) \
+    .returns([200, "an OrderedCollectionPage"],
+             [404, "page not available"]) \
   do
     result = AuditEvent.page(params[:page])
 
@@ -37,7 +38,8 @@ class ArchivesSpaceService < Sinatra::Base
     .description("Get an audit event by id")
     .permissions([])
     .params(["id", String, "The ID of the event to get"])
-    .returns([200, "an audit event"]) \
+    .returns([200, "an audit event"],
+             [404, "event not available"]) \
   do
     result = AuditEvent.by_id(params[:id])
 
@@ -52,9 +54,14 @@ class ArchivesSpaceService < Sinatra::Base
     .description("Get an OrderedCollection of events for object type")
     .permissions([])
     .params(["object_type", String, "The type of object to events for"])
-    .returns([200, "an OrderedCollection"]) \
+    .returns([200, "an OrderedCollection"],
+             [404, "unknown object type"]) \
   do
-    activity_json_response(AuditEvent.activity_stream(params[:object_type]))
+    if AuditEvent.object_types.include?(params[:object_type])
+      activity_json_response(AuditEvent.activity_stream(params[:object_type]))
+    else
+      raise NotFoundException.new("unknown object type")
+    end
   end
 
   Endpoint.get('/activity-stream/:object_type/page/:page')
@@ -62,7 +69,8 @@ class ArchivesSpaceService < Sinatra::Base
     .permissions([])
     .params(["object_type", String, "The type of object to events for"],
             ["page", Integer, "The page to get"])
-    .returns([200, "an OrderedCollectionPage"]) \
+    .returns([200, "an OrderedCollectionPage"],
+             [404, "page not available"]) \
   do
     result = AuditEvent.page(params[:page], params[:object_type])
 
