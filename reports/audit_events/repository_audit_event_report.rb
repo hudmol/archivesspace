@@ -1,4 +1,4 @@
-class RepositoryAuditEventReport < AbstractReport
+class RepositoryAuditEventReport < AuditEventsReport
   register_report({
                     :params => [
                       ["from", Date, "The start of report range"],

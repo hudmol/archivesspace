@@ -1,4 +1,4 @@
-class DeleteMergeTransferAuditEventReport < AbstractReport
+class DeleteMergeTransferAuditEventReport < AuditEventsReport
   register_report({
                     :params => [
                       ["from", Date, "The start of report range"],

@@ -215,9 +215,15 @@ class ArchivesSpaceService < Sinatra::Base
     .returns([200, "An array of output files"]) \
   do
     job = Job.get_or_die(params[:id])
-    files = JobFile.filter( :job_id => job.id ).select(:id).map {|f| f[:id] }
-    json_response(files)
 
+    if job.job_type == "report_job"
+      unless ReportManager.reports_for_current_user(current_user).keys.include?(job.job.fetch('report_type'))
+        files = []
+      end
+    end
+
+    files ||= JobFile.filter( :job_id => job.id ).select(:id).map {|f| f[:id] }
+    json_response(files)
   end
 
   Endpoint.get('/repositories/:repo_id/jobs/:id/output_files/:file_id')
@@ -228,6 +234,14 @@ class ArchivesSpaceService < Sinatra::Base
   .permissions([:view_repository])
   .returns([200, "Returns the file"]) \
 do
+  job = Job.get_or_die(params[:id])
+
+  if job.job_type == "report_job"
+    unless ReportManager.reports_for_current_user(current_user).keys.include?(job.job.fetch('report_type'))
+      raise AccessDeniedException.new("Access denied")
+    end
+  end
+
   file = JobFile.filter(  :id => params[:file_id], :job_id => params[:id] ).select(:file_path).first
   # ANW-267: Windows will corrupt PDFs with DOS line endings unless we return the file as a binary.
   content_type 'application/octect-stream'

@@ -39,4 +39,10 @@ module ReportManager
 
     end
   end
+
+  def self.reports_for_current_user(current_user)
+    @@registered_reports.select do |_, report|
+      report[:permissions].nil? || ASUtils.wrap(report.fetch(:permissions)).all? {|perm| current_user && current_user.can?(perm)}
+    end
+  end
 end
