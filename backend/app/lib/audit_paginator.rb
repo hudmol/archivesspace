@@ -235,6 +235,8 @@ class AuditPaginator
     end
   end
 
+  MARK_EVERYTHING_BATCH_SIZE = 100_000
+
   def self.mark_everything_updated!
     now = Time.now
 
@@ -258,8 +260,21 @@ class AuditPaginator
           target_repo: nil
         ) do |events|
           begin
-            model.select(:id).map(:id).each do |record_id|
-              events << record_id
+            min_id = model.min(:id)
+            max_id = model.max(:id)
+
+            if min_id && max_id
+              loop do
+                upper = min_id + MARK_EVERYTHING_BATCH_SIZE
+
+                model.where { (id >= min_id) & (id <= upper) }.select(:id).map(:id).each do |record_id|
+                  events << record_id
+                end
+
+                break if upper >= max_id
+
+                min_id = upper + 1
+              end
             end
           rescue
             Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
