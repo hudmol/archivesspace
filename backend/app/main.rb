@@ -179,26 +179,35 @@ class ArchivesSpaceService < Sinatra::Base
       # Start the notifications background delivery thread
       Notifications.init if ASpaceEnvironment.environment != :unit_test
 
-      # If audit logging is being turned on after previously being turned off,
-      # we want to generate audit events for all audited records as a catch-all.
-      if ASpaceEnvironment.environment != :unit_test
-        DB.open do |db|
-          row = db[:audit_enabled_tracking].order(Sequel.desc(:startup_time)).first
+      # Initialize audit logging
+      Thread.new do
+        begin
+          # If audit logging is being turned on after previously being turned off,
+          # we want to generate audit events for all audited records as a catch-all.
+          if ASpaceEnvironment.environment != :unit_test
+            DB.open do |db|
+              row = db[:audit_enabled_tracking].order(Sequel.desc(:startup_time)).first
 
-          audit_was_enabled = row ? row.fetch(:audit_enabled) == 1 : false
+              audit_was_enabled = row ? row.fetch(:audit_enabled) == 1 : false
 
-          if AppConfig[:enable_audit_logging] && !audit_was_enabled
-            AuditPaginator.mark_everything_updated!
+              if AppConfig[:enable_audit_logging] && !audit_was_enabled
+                AuditPaginator.mark_everything_updated!
+              end
+
+              db[:audit_enabled_tracking].insert(startup_time: Time.now, audit_enabled: AppConfig[:enable_audit_logging] ? 1 : 0)
+            end
           end
 
-          db[:audit_enabled_tracking].insert(startup_time: Time.now, audit_enabled: AppConfig[:enable_audit_logging] ? 1 : 0)
+
+          if AppConfig[:enable_audit_logging]
+            # Start the audit event paginator
+            AuditPaginator.start
+            Log.info("Audit logging started")
+          end
+        rescue Exception => e
+          Log.error("There was a failure initializing audit logging: #{e}")
+          Log.exception(e)
         end
-      end
-
-
-      if AppConfig[:enable_audit_logging]
-        # Start the audit event paginator
-        AuditPaginator.start
       end
 
       if ASpaceEnvironment.environment == :production
