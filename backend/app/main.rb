@@ -196,8 +196,10 @@ class ArchivesSpaceService < Sinatra::Base
       end
 
 
-      # Start the audit event paginator
-      AuditPaginator.start
+      if AppConfig[:enable_audit_logging]
+        # Start the audit event paginator
+        AuditPaginator.start
+      end
 
       if ASpaceEnvironment.environment == :production
         # Start the job scheduler
