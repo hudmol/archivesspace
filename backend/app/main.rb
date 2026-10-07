@@ -50,6 +50,8 @@ require 'ostruct'
 
 class ArchivesSpaceService < Sinatra::Base
 
+  Rack::Utils.multipart_part_limit = 0
+
   include URIResolver
   include RESTHelpers
 

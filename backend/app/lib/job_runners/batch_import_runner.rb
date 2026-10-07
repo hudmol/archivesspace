@@ -31,33 +31,39 @@ class BatchImportRunner < JobRunner
     input_file_paths = @job.job_files.map(&:full_file_path)
 
     begin
-      DB.open(true,
-              :retry_on_optimistic_locking_fail => true) do
+      begin
         created_uris = []
         begin
           input_file_paths.each_with_index do |input_file, i|
-            ticker.log(("=" * 50) + "\n#{filenames[i]}\n" + ("=" * 50)) if filenames[i]
-            converter = Converter.for(@json.job['import_type'], input_file, {:import_events => import_maint_events, :import_subjects => import_subjects, :import_repository => import_repository})
-            begin
-              RequestContext.open(:create_enums => true,
-                                  :current_username => @job.owner.username,
-                                  :repo_id => @job.repo_id) do
+            DB.open(true,
+                    :retry_on_optimistic_locking_fail => true) do
+              begin
+                ticker.log(("=" * 50) + "\n#{filenames[i]}\n" + ("=" * 50)) if filenames[i]
+                converter = Converter.for(@json.job['import_type'], input_file, {:import_events => import_maint_events, :import_subjects => import_subjects, :import_repository => import_repository})
+                begin
+                  RequestContext.open(:create_enums => true,
+                                      :current_username => @job.owner.username,
+                                      :repo_id => @job.repo_id) do
 
-                converter.run
+                    converter.run
 
-                File.open(converter.get_output_path, "r") do |fh|
-                  batch = StreamingImport.new(fh, ticker, @import_canceled)
-                  batch.process
+                    File.open(converter.get_output_path, "r") do |fh|
+                      batch = StreamingImport.new(fh, ticker, @import_canceled)
+                      batch.process
 
-                  if batch.created_records
-                    created_uris.concat(batch.created_records.values)
+                      if batch.created_records
+                        created_uris.concat(batch.created_records.values)
+                      end
+
+                      success = true
+                    end
                   end
-
-                  success = true
+                ensure
+                  converter.remove_files
                 end
+              rescue
+                Log.info("Trucking on!")
               end
-            ensure
-              converter.remove_files
             end
           end
 
@@ -76,7 +82,8 @@ class BatchImportRunner < JobRunner
           # job tables.
           #
           self.success!
-          log_created_uris(created_uris)
+          # log_created_uris(created_uris)
+
         rescue ImportCanceled
           raise Sequel::Rollback
         rescue JSONModel::ValidationException, ImportException, Converter::ConverterMappingError, Sequel::ValidationFailed, ReferenceError => e

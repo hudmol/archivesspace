@@ -166,7 +166,7 @@ class Job < Sequel::Model(:job)
 
   def record_created_uris(uris)
     uris.each do |uri|
-      add_created_record(:record_uri => uri)
+      # add_created_record(:record_uri => uri)
     end
   end
 
