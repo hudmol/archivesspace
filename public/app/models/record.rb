@@ -39,7 +39,14 @@ class Record
     @container_summary_for_badge = parse_container_summary_for_badge
     @container_titles_and_uris = parse_container_display(:include_uri => true)
     @linked_digital_objects = parse_digital_object_instances
-    @notes = parse_notes
+
+    if self.is_a?(Resource)
+      # MOMA doesn't use these at runtime, so we don't want to wear the cost of
+      # running Nokogiri.
+      @notes = {}
+    else
+      @notes = parse_notes
+    end
     @dates = parse_dates
     @lang_materials = parse_lang_materials
     @external_documents = parse_external_documents

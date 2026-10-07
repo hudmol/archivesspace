@@ -1128,3 +1128,42 @@ span.head {
     }
   }
 }
+
+.highlight {
+    background-color: #efefef;
+    border-right: solid 5px #999;
+}
+
+.finding-aid-wrapper {
+    display: flex;
+    gap: 2em;
+}
+
+.finding-aid-nav {
+    flex: 1;
+    flex-direction: column;
+    white-space: nowrap;
+    overflow-x: hidden;
+    position: sticky;
+    top: 5vh;
+    align-self: start;
+}
+
+.finding-aid-nav-inner {
+    height: 90vh;
+    scroll: auto;
+    padding: 5px;
+    border: 2px solid #efefef;
+}
+
+.finding-aid {
+    flex: 3;
+    flex-direction: column;
+}
+
+.back-to-top {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}

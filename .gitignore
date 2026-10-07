@@ -62,3 +62,4 @@ plugins/*/gems/*
 docker-compose.override.yml
 launcher/lib/*
 *~undo-tree~
+public/public/_repositories_*html

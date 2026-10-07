@@ -151,6 +151,22 @@ class ResourcesController < ApplicationController
       @has_digital_objects = has_digital_objects?
 
       @result =  archivesspace.get_record(uri, @criteria)
+
+      static_identifier = @result.uri.gsub('/', '_')
+
+      if (stream_resource = java.lang.Thread.current_thread.context_class_loader.get_resource_as_stream("#{static_identifier}.html"))
+        content = stream_resource.to_io.read
+      end
+
+      content ||= File.read(Rails.public_path.join("#{static_identifier}.html")) rescue nil
+
+      if content.nil?
+        raise "No MOMA canned resource found for ID: #{static_identifier}"
+      end
+
+      @content = content.split(%r{</?body>}).fetch(1)
+      @content.gsub!(%r{<h1.*</h1>}, '')
+
       @repo_info = @result.repository_information
       @page_title = "#{I18n.t('resource._singular')}: #{strip_mixed_content(@result.display_string)}"
       @context = [

@@ -91,6 +91,10 @@ class ObjectsController < ApplicationController
     begin
       @result = archivesspace.get_record(url, @criteria)
 
+      if (ref_id = @result['ref_id'])
+        return redirect_to(PrefixHelper.app_prefix(@result['resource'] + "#" + ref_id))
+      end
+
       if params[:obj_type] == 'digital_objects'
         tree_root = archivesspace.get_raw_record(uri + '/tree/root') rescue nil
         @has_children = tree_root && tree_root['child_count'] > 0
