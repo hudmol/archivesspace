@@ -36,7 +36,7 @@ class ArchivesSpace
   def initialize(backend_url, username, password)
     @url = backend_url
 
-    r = Net::HTTP.post_form(URI.parse(URI.join(@url, "/users/#{username}/login")),
+    r = Net::HTTP.post_form(URI.join(@url, "/users/#{username}/login"),
                        :password => password)
 
 
@@ -44,10 +44,15 @@ class ArchivesSpace
   end
 
   def get_json(path)
-    JSON.parse(Net::HTTP.get(URI.parse(URI.join(@url, path)),
-                             {
-                               "X-ArchivesSpace-Session" => @session
-                             }))
+    uri = URI.join(@url, path)
+    request = Net::HTTP::Get.new(uri)
+    request["X-ArchivesSpace-Session"] = @session
+
+    response = Net::HTTP.start(uri.host, uri.port, :use_ssl => uri.scheme == 'https') do |http|
+      http.request(request)
+    end
+
+    JSON.parse(response.body)
   end
 end
 
