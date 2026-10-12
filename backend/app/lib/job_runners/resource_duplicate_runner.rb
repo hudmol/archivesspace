@@ -7,7 +7,7 @@ class ResourceDuplicateRunner < JobRunner
 
   def run
     begin
-      RequestContext.open( :repo_id => @job.repo_id) do
+      RequestContext.open( :repo_id => @job.repo_id, :current_username => @job.owner.username) do
         parsed = JSONModel.parse_reference(@json.job["source"])
         resource_id = parsed[:id]
 
