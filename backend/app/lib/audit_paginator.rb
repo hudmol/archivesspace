@@ -12,10 +12,6 @@ class AuditPaginator
 
   PAGE_SIZE = 500
 
-  # Given the choice, make bulk events if there are this many records or more
-  # Otherwise or just make individual events
-  BULK_OPTIMIZATION_THRESHOLD = 50
-
   def self.start
     @thread ||= Thread.new do
       AuditPaginator.new.run
@@ -329,37 +325,23 @@ class AuditPaginator
     record_type_code = AuditEvent.object_type_code_for(jsonmodel_cls.record_type)
     return unless record_type_code
 
-    if record_ids.length > BULK_OPTIMIZATION_THRESHOLD
-      AuditPaginator.add_bulk_events(
-                                     timestamp: now,
-                                     record_type: record_type_code,
-                                     activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
-                                     change_method: RequestContext.get(:change_method) || AuditEvent::CHANGE_METHOD_API,
-                                     actor_type: AuditEvent::ACTOR_TYPE_PERSON,
-                                     actor_name: RequestContext.get(:current_username),
-                                     object_repo: nil,
-                                     target_repo: nil,
-                                     ) do |events|
-        begin
-          record_ids.each do |record_id|
-            events << record_id
-          end
-        rescue
-          Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
-          Log.exception($!)
+    AuditPaginator.add_bulk_events(
+      timestamp: now,
+      record_type: record_type_code,
+      activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
+      change_method: RequestContext.get(:change_method) || AuditEvent::CHANGE_METHOD_API,
+      actor_type: AuditEvent::ACTOR_TYPE_PERSON,
+      actor_name: RequestContext.get(:current_username),
+      object_repo: nil,
+      target_repo: nil,
+    ) do |events|
+      begin
+        record_ids.each do |record_id|
+          events << record_id
         end
-      end
-    else
-      model.any_repo.filter(id: record_ids).map do |record|
-        if record.respond_to?(:repo_id)
-          RequestContext.open(repo_id: record.repo_id) do
-            AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
-                                 AuditEvent::ROLE_OBJECT => record.uri)
-          end
-        else
-          AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
-                               AuditEvent::ROLE_OBJECT => record.uri)
-        end
+      rescue
+        Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
+        Log.exception($!)
       end
     end
   end
