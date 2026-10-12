@@ -41,7 +41,7 @@ class BatchImportRunner < JobRunner
             begin
               RequestContext.open(:create_enums => true,
                                   :current_username => @job.owner.username,
-                                  :change_method => AuditEvent::CHANGE_METHOD_IMPORTER,
+                                  :change_method => AuditEvent.change_method_for_import_type(@json.job['import_type']),
                                   :repo_id => @job.repo_id) do
 
                 converter.run

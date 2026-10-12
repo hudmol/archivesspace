@@ -140,6 +140,10 @@ class AuditEvent
     object_types.map{|ot| activity_stream_uri("/#{ot}")}
   end
 
+  def self.change_method_for_import_type(import_type)
+    AuditEvent::IMPORTER_CHANGE_METHOD_MAP.fetch(import_type, AuditEvent::CHANGE_METHOD_IMPORTER)
+  end
+
   def self.activity_stream(object_type = nil)
     DB.open do |db|
       page_info = AuditPaginator.page_statistics(db, object_type)
