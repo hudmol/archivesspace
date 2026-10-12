@@ -64,6 +64,49 @@ permissions required to hit these endpoints.
 /activity-stream/event/:id
 ```
 
+## Supported Object Types
+
+Most top level ArchivesSpace models are supported by default. Here is the
+current list:
+```
+repository
+agent_person
+agent_family
+agent_corporate_entity
+agent_software
+resource
+archival_object
+digital_object
+digital_object_component
+top_container
+container_profile
+subject
+classification
+```
+
+There are a number of ArchivesSpace models that are not included by default, but
+can be included via configuration. They are:
+```
+accession
+location
+assessment
+permission
+group
+user
+```
+
+An example config might look like this:
+```
+AppConfig[:audit_logging_include_object_types] = ['accession', 'user', 'group']
+```
+
+To find the Object Types supported for an ArchivesSpace instance, hit this
+endpoint:
+```
+GET /activity-stream/object_types
+```
+
+
 ## Event Logging
 
 Individual audit events are created by calls to `AuditEvent#log_event`. These
