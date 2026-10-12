@@ -62,6 +62,8 @@ INCONSIDERATELY_HARDCODED_BACKEND_URL = "http://localhost:4567"
 INCONSIDERATELY_HARDCODED_USERNAME = "admin"
 INCONSIDERATELY_HARDCODED_PASSWORD = "admin"
 
+include FindingAid::Helpers
+
 def main
   output_path = File.absolute_path(File.join(__dir__, '../public/public'))
 
@@ -84,12 +86,28 @@ def main
 
     ao_ids = client.get_json("/repositories/#{INCONSIDERATELY_HARDCODED_REPO_ID}/resources/#{resource_id}/ordered_records").fetch('uris')
 
+    has_digital_object_map = {}
+
+    ao_ids.each_slice(32) do |subset|
+      uri_subset = subset.map {|ao| ao.fetch('ref')}
+
+      uri_subset.map {|ao_ref| Thread.new { client.get_json("#{ao_ref}?resolve[]=digital_object&resolve[]=linked_agents") }}.each do |result|
+        if digital_instances?(result.value)
+          has_digital_object_map[result.value['uri']] = true
+          Array(result.value['ancestors']).each do |ancestor|
+            has_digital_object_map[ancestor['ref']] = true
+          end
+        end
+      end
+    end
+
     $stderr.puts("** Resource #{resource_id} contains #{ao_ids.length} Archival Objects")
 
     ao_ids.each_slice(32) do |subset|
       uri_subset = subset.map {|ao| ao.fetch('ref')}
 
-      uri_subset.map {|ao_ref| Thread.new { client.get_json(ao_ref) }}.each do |result|
+      uri_subset.map {|ao_ref| Thread.new { client.get_json("#{ao_ref}?resolve[]=digital_object&resolve[]=linked_agents") }}.each do |result|
+        result.value['has_digital_object'] = has_digital_object_map.fetch(result.value['uri'], false)
         fragments << renderer.render('archival_object.html.erb', result.value)
       end
     end
@@ -105,9 +123,9 @@ def main
   <body>
   <div class="finding-aid-wrapper">
   <section class="finding-aid-nav">
+    <div><label><input type="checkbox" id="toggle-do" /> Show Only Digital Material</label></div>
     <div class="finding-aid-nav-inner"></div>
   </section>
-
     <main class="finding-aid">
   #{fragments}
     </main>
@@ -139,21 +157,29 @@ window.addEventListener('DOMContentLoaded', function() {
 
   const nav = document.querySelector('.finding-aid-nav-inner');
 
-  document.querySelectorAll('section').forEach(section => {
+  document.querySelectorAll('.finding-aid-wrapper section').forEach(section => {
     const heading = section.querySelector('h1, h2, h3, h4, h5, h6');
     if (!heading) {
       return;
     }
     const level = parseInt(heading.tagName.substring(1), 10);
-    if (!section.id) {
-      section.id = 'gensec_' + Math.trunc(Math.random() * 1000000);
-    }
 
     const link = document.createElement('a');
+
+    if (!section.id) {
+      section.id = 'gensec_' + Math.trunc(Math.random() * 1000000);
+    } else {
+      link.classList.add('moma-lh-nav-item');
+    }
+
     link.href = '#' + section.id;
     link.textContent = heading.textContent.trim();
     link.style.display = 'block';
     link.style.marginLeft = (level - 1) + 'em';
+
+    if (section.classList.contains('moma-has-do')) {
+      link.classList.add('moma-has-do');
+    }
     nav.appendChild(link);
   });
 
@@ -173,8 +199,23 @@ window.addEventListener('DOMContentLoaded', function() {
       nav.scrollTo({ top: 0, behavior: 'instant' });
     }
   });
+
+  document.querySelector('#toggle-do').addEventListener('change', (event) => {
+    const showOnlyDigital = event.target.checked;
+    document.body.classList.toggle('show-only-digital', showOnlyDigital);
+  });
 </script>
 
+<style>
+body.show-only-digital .moma-item,
+body.show-only-digital .moma-lh-nav-item {
+  display: none !important;
+}
+body.show-only-digital .moma-item.moma-has-do,
+body.show-only-digital .moma-lh-nav-item.moma-has-do {
+  display: block !important;
+}
+</style>
 
   </body>
   </html>
