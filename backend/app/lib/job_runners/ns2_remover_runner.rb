@@ -39,6 +39,7 @@ class NS2RemoverRunner < JobRunner
               else
                 n.update(:notes => replaced.to_sequel_blob)
               end
+
               if parent_repo == @job.repo_id
                 modified_records << JSONModel(parent[:parent_type].to_sym).uri_for(parent[:parent_id], :repo_id => @job.repo_id)
               else
@@ -58,6 +59,19 @@ class NS2RemoverRunner < JobRunner
         @job.write_output("All done, no records modified.")
       else
         @job.write_output("All done, logging modified records.")
+
+        RequestContext.open(:current_username => @job.owner.username) do
+          modified_records.map{|uri| JSONModel.parse_reference(uri)}.group_by {|parsed_uri| parsed_uri[:type] }.map{|type, parsed_uris|
+            model = ASModel.all_models.find {|model|
+              jsonmodel = model.my_jsonmodel(true)
+              jsonmodel && jsonmodel.record_type == type
+            }
+
+            if model
+              AuditPaginator.log_bulk_update(model, parsed_uris.map{|pu| pu[:id] })
+            end
+          }
+        end
       end
 
       self.success!
