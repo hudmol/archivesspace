@@ -232,9 +232,7 @@ module JSONModel
         req['X-ArchivesSpace-Priority'] = "high"
       end
 
-      if ['POST', 'DELETE'].include?(req.method)
-        req['X-ArchivesSpace-Change-Method'] = AuditEvent::CHANGE_METHOD_FORM
-      end
+      req['X-ArchivesSpace-Change-Method'] = AuditEvent::CHANGE_METHOD_FORM
 
       response = http_conn.request(url, req, &block)
 
