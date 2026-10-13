@@ -109,7 +109,13 @@ class AuditEvent
     else
       # Regular single event (by id)
       DB.open do |db|
-        render(ds(db).filter(Sequel.qualify(:audit_event, :id) => Integer(event_id)).first)
+        event_id = Integer(event_id)
+
+        if (event = ds(db).filter(Sequel.qualify(:audit_event, :id) => event_id).first)
+          return render(event)
+        elsif (archived_event = AuditPaginator.find_archived_event(db, event_id))
+          return render(archived_event)
+        end
       end
     end
   end
@@ -210,6 +216,11 @@ class AuditEvent
       when 'audit'
         ids = audit_page.event_ids
         out[:orderedItems] = ds(db, nil, object_type).filter(:audit_event__id => ids).map {|row|
+          render(row, include_context: false)
+        }
+        out
+      when 'archived'
+        out[:orderedItems] = audit_page.extract_archive.map {|row|
           render(row, include_context: false)
         }
         out

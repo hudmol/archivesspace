@@ -52,6 +52,19 @@ class AuditPaginator
       id_set.to_a
     end
 
+    def extract_archive
+      raise "Can only extract from an archived page" unless self.page_type == 'archived'
+
+      result = JSON.parse(AuditPaginator.decompress(self.page.fetch(:archive)), symbolize_names: true)
+
+      result.each do |event|
+        # Rehydrate our date objects
+        event[:timestamp] = DateTime.parse(event[:timestamp])
+      end
+
+      result
+    end
+
     def page_type
       self.page.fetch(:page_event_type)
     end
@@ -70,6 +83,23 @@ class AuditPaginator
     has_next_page = requested_page.fetch(:is_page_complete) == 1 && page_ds.filter(:page_number => page + 1).count > 0
 
     AuditPage.new(requested_page, has_next_page)
+  end
+
+  def self.find_archived_event(db, event_id)
+    db[:audit_page]
+      .filter(page_event_type: 'archived', page_filter: ANY_TYPE)
+      .where { first_id_written <= event_id }
+      .where { last_id_written >= event_id }
+      .each do |matched_page|
+
+      AuditPage.new(matched_page, nil).extract_archive.each do |event_record|
+        if event_record.fetch(:event_id) == event_id
+          return event_record
+        end
+      end
+    end
+
+    return nil
   end
 
   BulkIDConsumer = Struct.new(:timestamp, :record_type, :record_type_code, :activity_type, :change_method, :actor_type, :actor_name, :object_repo, :target_repo) do
@@ -361,6 +391,97 @@ class AuditPaginator
 
     # "any type"
     paginate_audit_records_for_type
+
+    archive_pages
+  end
+
+  def archive_pages
+    max_unarchived_pages = AppConfig[:audit_logging_archive_threshold]
+
+    return if max_unarchived_pages.nil?
+
+    DB.open do |db|
+      AuditPaginator.lock_page_table!(db)
+
+      min_unarchived_page = db[:audit_page].filter(page_event_type: 'audit').min(:page_number)
+
+      return if min_unarchived_page.nil?
+
+      max_page_to_archive = if (max_page = db[:audit_page].max(:page_number))
+                              (max_page - max_unarchived_pages)
+                            end
+
+      if max_page_to_archive < min_unarchived_page
+        # Nothing to do
+        return
+      end
+
+      max_archives_remaining_this_round = 10
+
+      (min_unarchived_page..max_page_to_archive).each do |page_number_to_archive|
+        did_something = false
+
+        db[:audit_page].filter(page_number: page_number_to_archive, page_event_type: 'audit', is_page_complete: 1).each do |row|
+          ids = AuditPage.new(row, false).event_ids
+
+          filter = row.fetch(:page_filter)
+
+          if filter == ANY_TYPE
+            filter = nil
+          end
+
+          events = JSON.dump(AuditEvent.ds(db, nil, filter).filter(Sequel.qualify(:audit_event, :id) => ids).all)
+
+          compressed = AuditPaginator.compress(events)
+
+          db[:audit_page]
+            .filter(id: row.fetch(:id))
+            .update(
+              archive: Sequel.blob(compressed),
+              page_event_type: 'archived',
+              first_id_written: ids.min,
+              last_id_written: ids.max,
+            )
+
+          did_something = true
+        end
+
+        if did_something
+          max_archives_remaining_this_round -= 1
+
+          if max_archives_remaining_this_round == 0
+            # Avoid doing long runs of archiving and hurting responsiveness.  We'll go around again soon enough.
+            break
+          end
+        end
+      end
+
+      # Sweep our audit tables for rows that are now fully archived (not
+      # referenced by any 'audit' page)
+      live_ids = RoaringBitmap.new
+      db[:audit_page].filter(page_event_type: 'audit').each do |row|
+        id_set = RoaringBitmap.new
+        id_set.deserialize(ByteBuffer.wrap(row.fetch(:id_set)
+                                             .force_encoding(Encoding::ASCII_8BIT)
+                                             .to_java_bytes))
+
+        live_ids.or(id_set)
+      end
+
+      remove_ids = []
+
+      db[:audit_event].each do |audit_event|
+        next if live_ids.contains(audit_event.fetch(:id))
+        remove_ids << audit_event.fetch(:id)
+      end
+
+      unless remove_ids.empty?
+        db[:audit_record].filter(audit_event_id: remove_ids).delete
+        db[:audit_event].filter(id: remove_ids).delete
+
+        Log.info("Archived #{remove_ids.length} event records")
+      end
+    end
   end
 
   def paginate_audit_records_for_type(record_type = ANY_TYPE)
@@ -490,6 +611,34 @@ class AuditPaginator
   def self.lock_page_table!(db)
     db[:audit_page_lock].for_update.first or
       raise "Could not find a lock in table audit_page_lock.  Did the row get deleted by mistake?"
+  end
+
+  def self.compress(string)
+    out_bytes = java.io.ByteArrayOutputStream.new
+
+    gzip = java.util.zip.GZIPOutputStream.new(out_bytes)
+    gzip.write(string.to_java_bytes)
+    gzip.close
+
+    String.from_java_bytes(out_bytes.to_byte_array)
+  end
+
+  def self.decompress(gzip_bytes)
+    in_bytes = java.io.ByteArrayInputStream.new(gzip_bytes.to_java_bytes)
+    out_bytes = java.io.ByteArrayOutputStream.new
+
+    gzip = java.util.zip.GZIPInputStream.new(in_bytes)
+
+    buf = Java::byte[4096].new
+
+    while ((len = gzip.read(buf, 0, buf.length)) >= 0)
+      out_bytes.write(buf, 0, len)
+    end
+
+    gzip.close
+
+    java.lang.String.new(out_bytes.to_byte_array,
+                         java.nio.charset.StandardCharsets::UTF_8)
   end
 
 end
