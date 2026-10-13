@@ -51,6 +51,24 @@ describe 'AuditEvent model' do
     $testdb[:audit_event].delete
   end
 
+  # Insert `count` plain audit events that each reference `uri`, returning their
+  # ids in insertion order.  Used to build up full pages of events for archiving.
+  def create_audit_events(count, uri:, type: 'resource',
+                          activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
+                          timestamp: Time.utc(2024, 1, 1, 10, 0, 0))
+    count.times.map do
+      create_audit_event(:timestamp => timestamp,
+                         :activity_type => activity_type,
+                         :records => [{:role => AuditEvent::ROLE_OBJECT,
+                                       :type => type,
+                                       :uri => uri}])[:id]
+    end
+  end
+
+  def set_archive_threshold(max_unarchived_pages)
+    allow(AppConfig).to receive(:[]).with(:audit_logging_archive_threshold).and_return(max_unarchived_pages)
+  end
+
   def create_bulk_top_container_page(timestamp:, top_container_ids:, actor_name: 'bulk_user')
     AuditPaginator.add_bulk_events(:timestamp => timestamp,
                                    :record_type => AuditEvent::OBJECT_TYPE_TOP_CONTAINER,
@@ -447,6 +465,110 @@ describe 'AuditEvent model' do
       expect(call).not_to be_nil
       expect(call[:records][AuditEvent::ROLE_OBJECT]).to contain_exactly(merge_destination.uri, merge_candidate.uri)
       expect(call[:records][AuditEvent::ROLE_TARGET]).to eq(merge_destination.uri)
+    end
+  end
+
+  describe 'audit event page archiving' do
+    it 'archives older complete pages but keeps both the pages and their individual events retrievable' do
+      reset_audit_tables
+
+      # Keep only the most recent page unarchived
+      set_archive_threshold(1)
+
+      event_ids = create_audit_events(AuditPaginator::PAGE_SIZE * 2, :uri => @resource.uri)
+      AuditPaginator.new.send(:paginate_audit_records)
+
+      page_1_row = $testdb[:audit_page].filter(page_filter: AuditPaginator::ANY_TYPE, page_number: 1).first
+      page_2_row = $testdb[:audit_page].filter(page_filter: AuditPaginator::ANY_TYPE, page_number: 2).first
+
+      expect(page_1_row[:page_event_type]).to eq('archived')
+      expect(page_2_row[:page_event_type]).to eq('audit')
+
+      # The archived page's events have been removed from our audit tables
+      remaining_ids = $testdb[:audit_event].select_map(:id)
+      archived_ids = event_ids - remaining_ids
+
+      expect(archived_ids.length).to eq(AuditPaginator::PAGE_SIZE)
+      expect(remaining_ids.length).to eq(AuditPaginator::PAGE_SIZE)
+
+      # Both pages still fetchable
+      first_page = AuditEvent.page(1)
+      second_page = AuditEvent.page(2)
+
+      expect(first_page[:orderedItems].length).to eq(AuditPaginator::PAGE_SIZE)
+      expect(second_page[:orderedItems].length).to eq(AuditPaginator::PAGE_SIZE)
+
+      expect(first_page[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(@resource.uri))
+      expect(second_page[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(@resource.uri))
+
+      # Navigation between the archived page and the live page is preserved
+      expect(first_page[:next][:id]).to eq(AuditEvent.activity_stream_uri('/page/2'))
+      expect(first_page).not_to have_key(:prev)
+      expect(second_page[:prev][:id]).to eq(AuditEvent.activity_stream_uri('/page/1'))
+      expect(second_page).not_to have_key(:next)
+
+      # Fetching an individual event still works whether it lives in the archive
+      # or in the live tables
+      archived_event_id = archived_ids.first
+      live_event_id = remaining_ids.first
+
+      expect($testdb[:audit_event][:id => archived_event_id]).to be_nil
+      archived_event = AuditEvent.by_id(archived_event_id.to_s)
+      expect(archived_event[:id]).to eq(AuditEvent.activity_stream_uri("/event/#{archived_event_id}"))
+      expect(archived_event['object'][:id]).to eq(AuditEvent.archivesspace_uri(@resource.uri))
+
+      expect($testdb[:audit_event][:id => live_event_id]).not_to be_nil
+      live_event = AuditEvent.by_id(live_event_id.to_s)
+      expect(live_event[:id]).to eq(AuditEvent.activity_stream_uri("/event/#{live_event_id}"))
+      expect(live_event['object'][:id]).to eq(AuditEvent.archivesspace_uri(@resource.uri))
+    end
+
+    it 'does not archive pages that are not yet complete' do
+      reset_audit_tables
+
+      # A threshold of 0 would make every page eligible by page number, so only
+      # the completeness check protects the final partial page
+      set_archive_threshold(0)
+
+      # One full page, plus a few extra events that form an incomplete second page
+      create_audit_events(AuditPaginator::PAGE_SIZE + 3, :uri => @resource.uri)
+
+      AuditPaginator.new.send(:paginate_audit_records)
+
+      page_1_row = $testdb[:audit_page].filter(page_filter: AuditPaginator::ANY_TYPE, page_number: 1).first
+      page_2_row = $testdb[:audit_page].filter(page_filter: AuditPaginator::ANY_TYPE, page_number: 2).first
+
+      # The complete page is archived...
+      expect(page_1_row[:is_page_complete]).to eq(1)
+      expect(page_1_row[:page_event_type]).to eq('archived')
+
+      # ...but the incomplete page is left untouched
+      expect(page_2_row[:is_page_complete]).to eq(0)
+      expect(page_2_row[:page_event_type]).to eq('audit')
+
+      # Only the incomplete page's events remain live - the archived page's
+      # events were swept, the incomplete page's were not
+      expect($testdb[:audit_event].count).to eq(3)
+
+      # Both pages still render
+      expect(AuditEvent.page(1)[:orderedItems].length).to eq(AuditPaginator::PAGE_SIZE)
+      expect(AuditEvent.page(2)[:orderedItems].length).to eq(3)
+    end
+
+    it 'leaves everything live when there are fewer pages than the archive threshold' do
+      reset_audit_tables
+
+      set_archive_threshold(5)
+
+      create_audit_events(AuditPaginator::PAGE_SIZE * 2, :uri => @resource.uri)
+
+      AuditPaginator.new.send(:paginate_audit_records)
+
+      archived_pages = $testdb[:audit_page].filter(page_event_type: 'archived').count
+      expect(archived_pages).to eq(0)
+
+      # Nothing swept - every event is still present
+      expect($testdb[:audit_event].count).to eq(AuditPaginator::PAGE_SIZE * 2)
     end
   end
 
