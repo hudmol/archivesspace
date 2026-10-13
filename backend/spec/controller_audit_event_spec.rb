@@ -86,7 +86,27 @@ describe 'AuditEvent controller' do
       expect(after_count).to eq(before_count + 1)
     end
 
-    it 'records RAPID via the component add children endpoint' do
+    it 'records API via the component add children endpoint by default' do
+      resource = create(:json_resource)
+
+      archival_object = build(:json_archival_object, :dates => [])
+      children = JSONModel(:archival_record_children).from_hash({
+                                                                  'children' => [archival_object]
+                                                                })
+
+      before_count = $testdb[:audit_event].where(:change_method => AuditEvent::CHANGE_METHOD_API).count
+
+      post "#{resource.uri}/children",
+           children.to_json,
+           {
+             'CONTENT_TYPE' => 'application/json',
+           }
+
+      expect(last_response).to be_ok
+      expect($testdb[:audit_event].where(:change_method => AuditEvent::CHANGE_METHOD_API).count).to eq(before_count + 1)
+    end
+
+    it 'records RAPID via the component add children endpoint from frontend client' do
       resource = create(:json_resource)
 
       archival_object = build(:json_archival_object, :dates => [])
@@ -96,10 +116,14 @@ describe 'AuditEvent controller' do
 
       before_count = $testdb[:audit_event].where(:change_method => AuditEvent::CHANGE_METHOD_RAPID).count
 
-      url = URI("#{JSONModel::HTTP.backend_url}#{resource.uri}/children")
-      response = JSONModel::HTTP.post_json(url, children.to_json)
+      post "#{resource.uri}/children",
+           children.to_json,
+           {
+             'CONTENT_TYPE' => 'application/json',
+             'HTTP_X_ARCHIVESSPACE_CHANGE_METHOD' => AuditEvent::CHANGE_METHOD_FORM.to_s
+           }
 
-      expect(response.code).to eq('200')
+      expect(last_response).to be_ok
       expect($testdb[:audit_event].where(:change_method => AuditEvent::CHANGE_METHOD_RAPID).count).to eq(before_count + 1)
     end
   end
