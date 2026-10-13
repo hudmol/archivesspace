@@ -873,3 +873,5 @@ AppConfig[:activity_stream_use_relative_uris] = false
 # Supported optional types:
 #   accession, location, assessment, permission, group, user
 AppConfig[:audit_logging_include_object_types] = []
+
+AppConfig[:audit_logging_archive_threshold] = nil
