@@ -326,49 +326,43 @@ Some consequences of this design:
 
 ### Managing database storage
 
-[This section somewhat speculative because we haven't started
- implementing it yet]
-
 Another concern for an ever-growing set of activities is the space
 required for MySQL to store them all.  Although bulk activities don't
 take much space, a steady trickle of regular activities will use
-increasing amounts of space over time.
+increasing amounts of space over time in the `audit_event` and
+`audit_record` tables.
 
-The current plan is to implement archiving of these events, and we
-think the pagination system described above should set us up to do
-this.  The current plan is:
+To manage this, pages of activities can be archived.  When a page is
+archived, its underlying events are packed into a aggregated value,
+compressed, and written as a blob directly into the `audit_page`
+table.  The underlying events are then removed from the `audit_event`
+and `audit_record` tables.
 
-  * A background archiver process identifies the oldest N pages that
-    haven't yet been archived, based on some selection criteria
-    (target row count? age-based?)
+Archiving is switched off by default, but you can enable it with a
+`config.rb` setting like:
 
-  * It combines the activities of those pages into segments, where
-    each segment contains some workable number of pages.  Small enough
-    to fit comfortably in memory; large enough to reduce storage
-    overhead.
+     AppConfig[:audit_logging_archive_threshold] = 1000
 
-  * Each segment is compressed and inserted as a blob into a separate
-    table (`audit_archive`?), along with additional metadata
-    indicating the range of pages, the range of event IDs and the
-    activity stream the entry belongs to.
+The `audit_logging_archive_threshold` setting controls how many
+activity stream pages will be kept *unarchived* at any given time.  So
+setting a value of 1000 (as above) would leave alone the 1,000 most
+recently written pages and archive all other pages.  If you set the
+value to zero:
 
-  * The corresponding `audit_page` entries are rewritten to indicate
-    that the page has been archived, and to point to the corresponding
-    `audit_archive` entry.
+     AppConfig[:audit_logging_archive_threshold] = 0
 
-  * API requests for an archived page will fetch and decompress the
-    corresponding `audit_archive` entry to extract the relevant page.
+Then pages will be archived as soon as possible (that is, each page
+will be archived as soon as it is closed off).  Finally, you can
+disable archiving by setting the value to `nil` (the default):
 
-  * API requests for an archived event will scan the `audit_archive`
-    table's event ranges (DB index scan) to find the entry holding the
-    given event, then extract and scan to find the requested event
-    entry.
+     AppConfig[:audit_logging_archive_threshold] = nil
 
-Read performance of these API requests will need to be considered.  It
-might be desirable to consider some form of caching/readahead to
-accelerate clients who are making a sequential scan through a series
-of archived activity pages.
-
+From the point of view of the consumer of the API, archiving is
+completely transparent: the representation of activities doesn't
+change--it's purely a storage optimization at the database level.
+Archiving a page of activities should reduce the storage required by
+about 95%, and our testing suggests that storing 100 million archived
+events should consume about 350MB of database storage.
 
 ## Enforcing audit logging in Migrations
 
