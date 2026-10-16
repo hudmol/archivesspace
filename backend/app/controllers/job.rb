@@ -218,6 +218,7 @@ class ArchivesSpaceService < Sinatra::Base
     files = JobFile.filter( :job_id => job.id ).select(:id).map {|f| f[:id] }
     json_response(files)
 
+
   end
 
   Endpoint.get('/repositories/:repo_id/jobs/:id/output_files/:file_id')
