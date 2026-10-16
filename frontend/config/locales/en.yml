@@ -622,6 +622,7 @@ en:
     unpublished: Unpublished
     manage_assessment_attributes: Manage Assessment Attributes
     toggle_navigation: Toggle Navigation
+    manage_activity_stream: Manage Activity Stream
 
   header:
     staff_interface: ArchivesSpace Staff Interface

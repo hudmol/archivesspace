@@ -1,0 +1,236 @@
+<%= setup_context :title => t('navbar.manage_activity_stream') %>
+<div class="d-flex">
+  <div class="col-md-12">
+    <div class="record-toolbar d-flex align-items-center">
+    </div>
+    <div class="record-pane">
+      <h2><%= t('navbar.manage_activity_stream') %></h2>
+
+      <br>
+
+      <%= render_aspace_partial :partial => "shared/flash_messages" %>
+
+      <div class="tabbable">
+        <ul class="nav nav-tabs">
+          <li class="nav-item"><a class="nav-link" href="<%= url_for(:controller => :activity_stream, :action => :index) %>">Administration</a></li>
+          <li class="active nav-item"><a class="active nav-link" href="javascript:void(0)">Exports</a></li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active">
+            <br>
+            <p><button class="btn btn-default" id="showCreateExportButton">Create Export</button></p>
+            <% if @search_data['results'].length %>
+              <div class="table-responsive">
+                <table class="table table-striped table-bordered table-condensed">
+                  <thead>
+                    <tr>
+                      <th style="width: 280px;">Export Type</th>
+                      <th>Criteria</th>
+                      <th>Status</th>
+                      <th>Created by</th>
+                      <th>Created at</th>
+                      <th style="width: 120px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  <% @search_data['results'].each do |export| %>
+                    <tr>
+                      <td><%= export.export_type.sub('EXPORT_TYPE_', '') %></td>
+                      <td>
+
+                        <% export.criteria && export.criteria.each do |key, value| %>
+                          <% next if value.empty? || key == 'jsonmodel_type'%>
+                          <strong><%= t("activity_stream_export.criteria.#{key}") %>: </strong>
+                          <% if key == 'user' %>
+                            <%= [value.dig('_resolved', 'username'), value.dig('ref')].compact.join(' - ') %>
+                          <% elsif key == 'repository' %>
+                            <%= [value.dig('_resolved', 'repo_code'), value.dig('ref')].compact.join(' - ') %>
+                          <% elsif key == 'resource' %>
+                            <%= [value.dig('_resolved', 'title'), value.dig('ref')].compact.join(' - ') %>
+                          <% else %>
+                            <%= ASUtils.wrap(value).join(', ') %>
+                          <% end %>
+                          <br>
+                        <% end %>
+                      </td>
+                      <td><%= export.status.sub('EXPORT_STATUS_', '') %></td>
+                      <td><%= export.created_by %></td>
+                      <td><%= export.create_time %></td>
+                      <td>
+                        <% if export.status == 'EXPORT_STATUS_COMPLETE' %>
+                          <%= link_to 'Download', url_for(controller: :activity_stream, action: :export_download, id: export.id), class: 'btn btn-sm btn-default' %>
+                        <% end %>
+                      </td>
+                    </tr>
+                  <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% else %>
+              <p class="alert alert-info">
+                No exports.
+              </p>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="create_export_popup_template"><!--
+  <%= form_tag({:controller => :activity_stream, :action => :export_create}, {:class => "form-horizontal" }) do |f| %>
+    <div class="modal-body">
+      <div id="generalError" class="alert alert-danger" style="display: none;">Please provide all required fields and ensure your dates are in the correct format.</div>
+      <div class="form-group w-100 row required">
+        <label class="col-sm-2 control-label text-right" for="export_type">Export Type</label>
+        <div class="col-sm-9">
+          <select id="export_type" name="export_type" class="form-control">
+            <option>-- Select an Export Type --</option>
+            <option value="EXPORT_TYPE_USER">User-based</option>
+            <option value="EXPORT_TYPE_COLLECTION">Collection/Resource</option>
+            <option value="EXPORT_TYPE_REPOSITORY">Repository</option>
+            <option value="EXPORT_TYPE_DELETE_MERGE_TRANSFER">Delete, Merge, Transfer</option>
+          </select>
+        </div>
+      </div>
+      <hr>
+      <p id="no_export_type">Please select an export type to see the criteria.</p>
+      <div id="export_criteria" style="display: none;">
+      <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_USER', 'EXPORT_TYPE_COLLECTION', 'EXPORT_TYPE_REPOSITORY', 'EXPORT_TYPE_DELETE_MERGE_TRANSFER']">
+        <label class="col-sm-2 control-label text-right" for="from_date">From Date</label>
+        <div class="col-sm-9">
+          <input type="text" class="form-control date-field" id="from_date" name="criteria[from_date]"
+              placeholder="YYYY-MM-DD"
+              data-format="yyyy-mm-dd"
+              data-date="<%= Date.today.strftime('%Y-%m-%d') %>"
+              data-autoclose="true"
+              data-force-parse="false"
+              data-label="<%= I18n.t("actions.date_picker_toggle") %>"
+          />
+        </div>
+      </div>
+      <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_USER', 'EXPORT_TYPE_COLLECTION', 'EXPORT_TYPE_REPOSITORY', 'EXPORT_TYPE_DELETE_MERGE_TRANSFER']">
+        <label class="col-sm-2 control-label text-right" for="to_date">To Date</label>
+        <div class="col-sm-9">
+          <input type="text" class="form-control date-field" id="to_date" name="criteria[to_date]"
+              placeholder="YYYY-MM-DD"
+              data-format="yyyy-mm-dd"
+              data-date="<%= Date.today.strftime('%Y-%m-%d') %>"
+              data-autoclose="true"
+              data-force-parse="false"
+              data-label="<%= I18n.t("actions.date_picker_toggle") %>"
+          />
+        </div>
+      </div>
+      <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_USER']">
+        <label class="col-sm-2 control-label text-right" for="user_linker">User</label>
+        <div class="col-sm-9">
+          <div class="form-group required">
+            <div class="input-group linker-wrapper">
+              <input type="text" class="linker"
+                   id="user_linker"
+                   data-label_browse="Browse Users"
+                   data-label_link="Select User"
+                   data-path="criteria"
+                   data-name="user_agent_ref"
+                   data-url="<%= url_for :controller => :search, :action => :do_search, :format => :json %>"
+                   data-browse-url="<%= url_for :controller => :search, :action => :do_search, :format => :js %>"
+                   data-selected="[]"
+                   data-format_property="display_string"
+                   data-multiplicity="one"
+                   data-types='["agent_with_user"]'
+                   aria-label="Select user to report on"
+              />
+              <div class="input-group-append">
+                <button
+                  type="button"
+                  class="btn btn-default dropdown-toggle"
+                  data-toggle="dropdown"
+                  aria-expanded="false"
+                  aria-label="Select user to report on"
+                ></button>
+                <ul class="dropdown-menu">
+                  <li>
+                    <button
+                      type="button"
+                      class="btn btn-sm rounded-0 dropdown-item linker-browse-btn"
+                    ><%= t("actions.browse") %></button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_COLLECTION']">
+        <label class="col-sm-2 control-label text-right" for="resource_linker">Resource</label>
+        <div class="col-sm-9">
+          <div class="form-group required">
+            <div class="input-group linker-wrapper">
+              <input type="text" class="linker"
+                   id="resource_linker"
+                   data-label_browse="Browse Resources"
+                   data-label_link="Select Resource"
+                   data-path="criteria"
+                   data-name="resource_ref"
+                   data-url="<%= url_for :controller => :search, :action => :do_search, :format => :json %>"
+                   data-browse-url="<%= url_for :controller => :search, :action => :do_search, :format => :js %>"
+                   data-selected="[]"
+                   data-format_property="display_string"
+                   data-multiplicity="one"
+                   data-types='["resource"]'
+                   aria-label="Select resource to report on"
+              />
+              <div class="input-group-append">
+                <button
+                  type="button"
+                  class="btn btn-default dropdown-toggle"
+                  data-toggle="dropdown"
+                  aria-expanded="false"
+                  aria-label="Select resource to report on"
+                ></button>
+                <ul class="dropdown-menu">
+                  <li>
+                    <button
+                      type="button"
+                      class="btn btn-sm rounded-0 dropdown-item linker-browse-btn"
+                      aria-label="Browse resources"
+                    ><%= t("actions.browse") %></button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_REPOSITORY']">
+        <label class="col-sm-2 control-label text-right" for="repository_ref">Repository</label>
+        <div class="col-sm-9">
+          <select id="repository_ref" name="criteria[repository_ref]" class="form-control">
+            <option value="">-- Select a Repository --</option>
+            <% @repositories.each do |repository| %>
+              <option value="<%= repository['uri'] %>"><%= repository['repo_code'] %></option>
+            <% end %>
+          </select>
+        </div>
+      </div>
+      <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_DELETE_MERGE_TRANSFER']">
+        <label class="col-sm-2 control-label text-right" for="user_agent_ref">Object Type(s)</label>
+        <div class="col-sm-9">
+          <select id="object_types" name="criteria[object_type][]" class="form-control" multiple>
+            <% @object_types.each do |type| %>
+              <option><%= type %></option>
+            <% end %>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Submit Export</button>
+        <button class="btn btn-cancel btn-default" data-dismiss="modal"><%= t("actions.cancel") %></button>
+    </div>
+  <% end %>
+--></div>
+
+<%= javascript_include_tag "activity_stream_exports" %>
