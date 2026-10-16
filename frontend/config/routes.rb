@@ -316,6 +316,10 @@ ArchivesSpace::Application.routes.draw do
     match 'bulk_import_templates' => 'bulk_import_templates#index', via: [:get]
     match 'bulk_import_templates/download' => 'bulk_import_templates#download', via: [:get]
 
+    match 'activity_stream' => 'activity_stream#index', via: [:get]
+    match 'activity_stream/exports' => 'activity_stream#exports', via: [:get]
+    match 'activity_stream/exports/create' => 'activity_stream#export_create', via: [:post]
+    match 'activity_stream/exports/:id/download' => 'activity_stream#export_download', via: [:get]
 
     if Plugins.system_menu_items?
       scope '/plugins' do
