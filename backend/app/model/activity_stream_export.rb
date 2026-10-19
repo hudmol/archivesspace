@@ -182,7 +182,7 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
       return false
     end
 
-    if criteria['repository'] && !record_uri.start_with?(criteria['repository']['ref'] + '/') && record_uri != criteria['repository']['ref']
+    if criteria['repository'] && !event_associated_with_repository?(event, record_uri, criteria['repository']['ref'])
       return false
     end
 
@@ -200,6 +200,58 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
     @criteria_cache[user_ref] = user.username
 
     user.username
+  end
+
+  def event_associated_with_repository?(event, record_uri, repository_uri)
+    # did you happen to the repository?
+    return true if record_uri == repository_uri
+
+    # check if the record is in the repository
+    return true if record_uri.start_with?(repository_uri + '/')
+
+    # check if the record was transferred into the repository
+    return true if event.fetch('target', {}).fetch('id', '').start_with?(repository_uri + '/')
+
+    # if the record is from another repository, then it is not associated
+    return false if record_uri.start_with?('/repositories/')
+
+    # for global events, check if the actor has access to the repository in question
+    username = event.fetch('actor').fetch('name')
+
+    # populate a cache of all the admin users and the users and the repositories they have access to
+    if !@criteria_repository_user_cache && !@criteria_admin_user_cache
+      # all the admin users
+      @criteria_admin_user_cache = Set.new
+
+      # users and the repositories they have access to
+      @criteria_repository_user_cache = {}
+
+      DB.open do |db|
+        db[:group]
+          .join(:group_user, Sequel.qualify(:group_user, :group_id) => Sequel.qualify(:group, :id))
+          .join(:user, Sequel.qualify(:group_user, :user_id) => Sequel.qualify(:user, :id))
+          .filter(Sequel.qualify(:group, :group_code) => 'administrators')
+          .select(
+            Sequel.qualify(:user, :username))
+          .each do |row|
+          @criteria_admin_user_cache.add(row[:username])
+        end
+
+        db[:group]
+          .join(:group_user, Sequel.qualify(:group_user, :group_id) => Sequel.qualify(:group, :id))
+          .join(:user, Sequel.qualify(:group_user, :user_id) => Sequel.qualify(:user, :id))
+          .select(
+            Sequel.qualify(:group, :repo_id),
+            Sequel.qualify(:user, :username))
+          .each do |row|
+          @criteria_repository_user_cache[row[:username]] ||= Set.new
+          @criteria_repository_user_cache[row[:username]] << JSONModel(:repository).uri_for(row[:repo_id])
+        end
+      end
+    end
+
+    @criteria_admin_user_cache.include?(username) ||
+      @criteria_repository_user_cache.fetch(username, Set.new).include?(repository_uri)
   end
 
   def self.sequel_to_jsonmodel(objs, opts = {})
