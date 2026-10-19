@@ -12,7 +12,7 @@ class ActivityStreamController < ApplicationController
     @object_types = JSONModel::HTTP.get_json('/activity-stream/object_types').map{|uri| uri.split('/').last}
     @search_data = JSONModel(:activity_stream_export).all(
       page: [Integer(params[:page] || 1), 1].max,
-      page_size: 50,
+      page_size: 10,
       sort_field: params.fetch(:sort, :username),
       sort_direction: params.fetch(:direction, :asc),
       'resolve[]': ['criteria::user', 'criteria::repository', 'criteria::resource'],
