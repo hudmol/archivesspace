@@ -1,10 +1,11 @@
 class ActivityStreamController < ApplicationController
-  set_access_control 'view_repository' => [:index,
+  # FIXME permissions
+  set_access_control 'view_repository' => [:admin,
                                            :exports,
                                            :export_create,
                                            :export_download]
 
-  def index
+  def admin
   end
 
   def exports

@@ -12,35 +12,34 @@
 
       <div class="tabbable">
         <ul class="nav nav-tabs">
-          <li class="nav-item"><a class="nav-link" href="<%= url_for(:controller => :activity_stream, :action => :index) %>">Administration</a></li>
-          <li class="active nav-item"><a class="active nav-link" href="javascript:void(0)">Exports</a></li>
+          <li class="active nav-item"><a class="active nav-link" href="javascript:void(0)"><%= t('activity_stream._frontend.exports_tab') %></a></li>
+          <li class="nav-item"><a class="nav-link" href="<%= url_for(:controller => :activity_stream, :action => :admin) %>"><%= t('activity_stream._frontend.admin_tab') %></a></li>
         </ul>
         <div class="tab-content">
           <div class="tab-pane active">
             <br>
-            <p><button class="btn btn-default" id="showCreateExportButton">Create Export</button></p>
+            <p><button class="btn btn-default" id="showCreateExportButton"><%= t('activity_stream._frontend.action.create_export') %></button></p>
             <% if @search_data['results'].length %>
               <div class="table-responsive">
                 <table class="table table-striped table-bordered table-condensed">
                   <thead>
                     <tr>
-                      <th style="width: 280px;">Export Type</th>
-                      <th>Criteria</th>
-                      <th>Status</th>
-                      <th>Created by</th>
-                      <th>Created at</th>
+                      <th style="width: 280px;"><%= t('activity_stream._frontend.export_type') %></th>
+                      <th><%= t('activity_stream._frontend.export_criteria') %></th>
+                      <th><%= t('activity_stream._frontend.export_status') %></th>
+                      <th><%= t('activity_stream._frontend.export_created_by') %></th>
+                      <th><%= t('activity_stream._frontend.export_created_at') %></th>
                       <th style="width: 120px;"></th>
                     </tr>
                   </thead>
                   <tbody>
                   <% @search_data['results'].each do |export| %>
                     <tr>
-                      <td><%= export.export_type.sub('EXPORT_TYPE_', '') %></td>
+                      <td><%= t("activity_stream._frontend.#{export.export_type.downcase}") %></td>
                       <td>
-
                         <% export.criteria && export.criteria.each do |key, value| %>
                           <% next if value.empty? || key == 'jsonmodel_type'%>
-                          <strong><%= t("activity_stream_export.criteria.#{key}") %>: </strong>
+                          <strong><%= t("activity_stream._frontend.activity_stream_export_criteria.#{key}") %>: </strong>
                           <% if key == 'user' %>
                             <%= [value.dig('_resolved', 'username'), value.dig('ref')].compact.join(' - ') %>
                           <% elsif key == 'repository' %>
@@ -53,12 +52,26 @@
                           <br>
                         <% end %>
                       </td>
-                      <td><%= export.status.sub('EXPORT_STATUS_', '') %></td>
+                      <td>
+                        <%
+                          badge_css_class =
+                            if export.status == 'EXPORT_STATUS_COMPLETE'
+                               'badge-success'
+                            elsif export.status == 'EXPORT_STATUS_ERRORED'
+                              'badge-danger'
+                            else
+                              'badge-default'
+                            end
+                        %>
+                        <span class="badge <%= badge_css_class %>">
+                          <%= t("activity_stream._frontend.#{export.status.downcase}") %>
+                        </span>
+                      </td>
                       <td><%= export.created_by %></td>
-                      <td><%= export.create_time %></td>
+                      <td><%= Time.parse(export.create_time).getlocal %></td>
                       <td>
                         <% if export.status == 'EXPORT_STATUS_COMPLETE' %>
-                          <%= link_to 'Download', url_for(controller: :activity_stream, action: :export_download, id: export.id), class: 'btn btn-sm btn-default' %>
+                          <%= link_to t('activity_stream._frontend.action.download_export'), url_for(controller: :activity_stream, action: :export_download, id: export.id), class: 'btn btn-sm btn-default' %>
                         <% end %>
                       </td>
                     </tr>
@@ -68,7 +81,7 @@
               </div>
             <% else %>
               <p class="alert alert-info">
-                No exports.
+                <%= t('activity_stream._frontend.no_exports') %>
               </p>
             <% end %>
           </div>
@@ -81,16 +94,16 @@
 <div id="create_export_popup_template"><!--
   <%= form_tag({:controller => :activity_stream, :action => :export_create}, {:class => "form-horizontal" }) do |f| %>
     <div class="modal-body">
-      <div id="generalError" class="alert alert-danger" style="display: none;">Please provide all required fields and ensure your dates are in the correct format.</div>
+      <div id="generalError" class="alert alert-danger" style="display: none;"><%= t("activity_stream._frontend.general_error") %></div>
       <div class="form-group w-100 row required">
         <label class="col-sm-2 control-label text-right" for="export_type">Export Type</label>
         <div class="col-sm-9">
           <select id="export_type" name="export_type" class="form-control">
-            <option>-- Select an Export Type --</option>
-            <option value="EXPORT_TYPE_USER">User-based</option>
-            <option value="EXPORT_TYPE_COLLECTION">Collection/Resource</option>
-            <option value="EXPORT_TYPE_REPOSITORY">Repository</option>
-            <option value="EXPORT_TYPE_DELETE_MERGE_TRANSFER">Delete, Merge, Transfer</option>
+            <option><%= t("activity_stream._frontend.select_an_export_type") %></option>
+            <option value="EXPORT_TYPE_USER"><%= t("activity_stream._frontend.export_type_user") %></option>
+            <option value="EXPORT_TYPE_COLLECTION"><%= t("activity_stream._frontend.export_type_collection") %></option>
+            <option value="EXPORT_TYPE_REPOSITORY"><%= t("activity_stream._frontend.export_type_repository") %></option>
+            <option value="EXPORT_TYPE_DELETE_MERGE_TRANSFER"><%= t("activity_stream._frontend.export_type_delete_merge_transfer") %></option>
           </select>
         </div>
       </div>
@@ -98,7 +111,7 @@
       <p id="no_export_type">Please select an export type to see the criteria.</p>
       <div id="export_criteria" style="display: none;">
       <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_USER', 'EXPORT_TYPE_COLLECTION', 'EXPORT_TYPE_REPOSITORY', 'EXPORT_TYPE_DELETE_MERGE_TRANSFER']">
-        <label class="col-sm-2 control-label text-right" for="from_date">From Date</label>
+        <label class="col-sm-2 control-label text-right" for="from_date"><%= t('activity_stream._frontend.activity_stream_export_criteria.from_date') %></label>
         <div class="col-sm-9">
           <input type="text" class="form-control date-field" id="from_date" name="criteria[from_date]"
               placeholder="YYYY-MM-DD"
@@ -111,7 +124,7 @@
         </div>
       </div>
       <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_USER', 'EXPORT_TYPE_COLLECTION', 'EXPORT_TYPE_REPOSITORY', 'EXPORT_TYPE_DELETE_MERGE_TRANSFER']">
-        <label class="col-sm-2 control-label text-right" for="to_date">To Date</label>
+        <label class="col-sm-2 control-label text-right" for="to_date"><%= t('activity_stream._frontend.activity_stream_export_criteria.to_date') %></label>
         <div class="col-sm-9">
           <input type="text" class="form-control date-field" id="to_date" name="criteria[to_date]"
               placeholder="YYYY-MM-DD"
@@ -124,14 +137,14 @@
         </div>
       </div>
       <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_USER']">
-        <label class="col-sm-2 control-label text-right" for="user_linker">User</label>
+        <label class="col-sm-2 control-label text-right" for="user_linker"><%= t('activity_stream._frontend.activity_stream_export_criteria.user') %></label>
         <div class="col-sm-9">
           <div class="form-group required">
             <div class="input-group linker-wrapper">
               <input type="text" class="linker"
                    id="user_linker"
-                   data-label_browse="Browse Users"
-                   data-label_link="Select User"
+                   data-label_browse="<%= t('activity_stream._frontend.linker.browse_users') %>"
+                   data-label_link="<%= t('activity_stream._frontend.linker.select_users') %>"
                    data-path="criteria"
                    data-name="user_agent_ref"
                    data-url="<%= url_for :controller => :search, :action => :do_search, :format => :json %>"
@@ -140,7 +153,7 @@
                    data-format_property="display_string"
                    data-multiplicity="one"
                    data-types='["agent_with_user"]'
-                   aria-label="Select user to report on"
+                   aria-label="<%= t('activity_stream._frontend.linker.aria_label_users') %>"
               />
               <div class="input-group-append">
                 <button
@@ -148,7 +161,7 @@
                   class="btn btn-default dropdown-toggle"
                   data-toggle="dropdown"
                   aria-expanded="false"
-                  aria-label="Select user to report on"
+                  aria-label="<%= t('activity_stream._frontend.linker.aria_label_users') %>"
                 ></button>
                 <ul class="dropdown-menu">
                   <li>
@@ -170,8 +183,8 @@
             <div class="input-group linker-wrapper">
               <input type="text" class="linker"
                    id="resource_linker"
-                   data-label_browse="Browse Resources"
-                   data-label_link="Select Resource"
+                   data-label_browse="<%= t('activity_stream._frontend.linker.browse_resources') %>"
+                   data-label_link="<%= t('activity_stream._frontend.linker.select_resources') %>"
                    data-path="criteria"
                    data-name="resource_ref"
                    data-url="<%= url_for :controller => :search, :action => :do_search, :format => :json %>"
@@ -180,7 +193,7 @@
                    data-format_property="display_string"
                    data-multiplicity="one"
                    data-types='["resource"]'
-                   aria-label="Select resource to report on"
+                   aria-label="<%= t('activity_stream._frontend.linker.aria_label_resources') %>"
               />
               <div class="input-group-append">
                 <button
@@ -188,14 +201,14 @@
                   class="btn btn-default dropdown-toggle"
                   data-toggle="dropdown"
                   aria-expanded="false"
-                  aria-label="Select resource to report on"
+                  aria-label="<%= t('activity_stream._frontend.linker.aria_label_resources') %>"
                 ></button>
                 <ul class="dropdown-menu">
                   <li>
                     <button
                       type="button"
                       class="btn btn-sm rounded-0 dropdown-item linker-browse-btn"
-                      aria-label="Browse resources"
+                      aria-label="<%= t('activity_stream._frontend.linker.browse_resources') %>"
                     ><%= t("actions.browse") %></button>
                   </li>
                 </ul>
@@ -205,10 +218,12 @@
         </div>
       </div>
       <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_REPOSITORY']">
-        <label class="col-sm-2 control-label text-right" for="repository_ref">Repository</label>
+        <label class="col-sm-2 control-label text-right" for="repository_ref">
+          <%= t('activity_stream._frontend.activity_stream_export_criteria.repository') %>
+        </label>
         <div class="col-sm-9">
           <select id="repository_ref" name="criteria[repository_ref]" class="form-control">
-            <option value="">-- Select a Repository --</option>
+            <option value=""><%= t('activity_stream._frontend.activity_stream_export_criteria.select_repository') %></option>
             <% @repositories.each do |repository| %>
               <option value="<%= repository['uri'] %>"><%= repository['repo_code'] %></option>
             <% end %>
@@ -216,7 +231,7 @@
         </div>
       </div>
       <div class="form-group w-100 row required" data-supports="['EXPORT_TYPE_DELETE_MERGE_TRANSFER']">
-        <label class="col-sm-2 control-label text-right" for="user_agent_ref">Object Type(s)</label>
+        <label class="col-sm-2 control-label text-right" for="user_agent_ref"><%= t('activity_stream._frontend.activity_stream_export_criteria.object_types') %> %></label>
         <div class="col-sm-9">
           <select id="object_types" name="criteria[object_type][]" class="form-control" multiple>
             <% @object_types.each do |type| %>
@@ -227,7 +242,7 @@
       </div>
     </div>
     <div class="modal-footer">
-        <button type="submit" class="btn btn-primary">Submit Export</button>
+        <button type="submit" class="btn btn-primary"><%= t("activity_stream._frontend.action.submit_export") %></button>
         <button class="btn btn-cancel btn-default" data-dismiss="modal"><%= t("actions.cancel") %></button>
     </div>
   <% end %>

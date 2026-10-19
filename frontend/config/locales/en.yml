@@ -2596,3 +2596,45 @@ en:
     aspace_location_import_template_csv: Create new location records. Please note that this template is for creating the location records themselves, not linking materials to locations.
     aspace_assessment_import_template_csv: Create and link assessments to existing accessions, resources, archival objects, or digital objects.
     aspace_subject_import_template_csv: Create new Subject records. Please note that this template is for creating the subject records themselves, not linking them to other records.
+
+  activity_stream:
+    _frontend:
+      exports_tab: Exports
+      admin_tab: Administration
+      export_type: Export Type
+      export_criteria: Criteria
+      export_status: Status
+      export_created_by: Created By
+      export_created_at: Created At
+      select_an_export_type: -- Select an Export Type --
+      please_select_export_type_message: Please select an export type to view the export criteria.
+      create_export_popup_title: Create an Activity Stream Export
+      export_type_user: User
+      export_type_collection: Collection/Resource
+      export_type_repository: Repository
+      export_type_delete_merge_transfer: Delete/Merge/Transfer
+      export_status_queued: Queued
+      export_status_running: Running
+      export_status_complete: Complete
+      export_status_errored: Errored
+      no_exports: No exports.
+      general_error: Please provide all required fields and ensure your dates are in the correct format.
+      activity_stream_export_criteria:
+        user: User
+        resource: Resource
+        repository: Repository
+        from_date: From Date
+        to_date: To Date
+        select_repository: -- Select a Repository --
+        object_types: Object Type(s)
+      linker:
+        browse_users: Browse Users
+        select_users: Select Users
+        aria_label_users: Select user to report on
+        browse_resources: Browse Resources
+        select_resources: Select Resources
+        aria_label_resources: Select resource to report on
+      action:
+        create_export: Create Export
+        submit_export: Submit Export
+        download_export: Download

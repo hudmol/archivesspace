@@ -45,7 +45,7 @@
         <li><%= link_to t("navbar.manage_users"), {:controller => :users, :action => :create}, :class => "dropdown-item" %></li>
       <% end %>
       <% if user_can?('view_repository') # FIXME permissions %>
-        <li><%= link_to t("navbar.manage_activity_stream"), {:controller => :activity_stream, :action => :index}, :class => "dropdown-item" %></li>
+        <li><%= link_to t("navbar.manage_activity_stream"), {:controller => :activity_stream, :action => :exports}, :class => "dropdown-item" %></li>
       <% end %>
       <% if user_can?('create_repository') || user_can?('manage_users') %>
         <li><%= link_to t("navbar.system_info"), {:controller => :system_info, :action => :show}, :class => "dropdown-item" %></li>
