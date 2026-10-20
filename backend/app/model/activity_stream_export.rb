@@ -333,13 +333,32 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
       raise "Invalid export type: #{export_type}"
     end
 
-    # FIXME CHECK ISO DATE FORMAT TOO
     unless criteria['from_date']
       raise "Missing from_date in criteria"
     end
 
+    begin
+      if criteria['from_date'] =~ /[1-2]\d{3}-[01]\d-[0-3]\d/
+        Date.strptime(criteria['from_date'], '%Y-%m-%d')
+      else
+        raise ArgumentError.new("Invalid date")
+      end
+    rescue ArgumentError
+      raise "Invalid from_date in criteria"
+    end
+
     unless criteria['to_date']
       raise "Missing to_date in criteria"
+    end
+
+    begin
+      if criteria['to_date'] =~ /[1-2]\d{3}-[01]\d-[0-3]\d/
+        Date.strptime(criteria['to_date'], '%Y-%m-%d')
+      else
+        raise ArgumentError.new("Invalid date")
+      end
+    rescue ArgumentError
+      raise "Invalid to_date in criteria"
     end
 
     case export_type
