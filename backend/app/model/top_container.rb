@@ -303,10 +303,14 @@ class TopContainer < Sequel::Model(:top_container)
   end
 
   def self.log_audit_event_for_batch(ids)
-    RequestContext.open(:change_method => AuditEvent::CHANGE_METHOD_MANAGE_TOP_CONTAINERS) do
-      AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
-                           AuditEvent::ROLE_OBJECT => ids.map{|id| JSONModel(:top_container).uri_for(id, :repo_id => RequestContext.get(:repo_id))})
+    # If change_method is already set then we've come from the frontend and hence manage top containers
+    # so change it to manage top containers. Otherwise we've come directly from an API call so let it default to API
+    if RequestContext.get(:change_method)
+      RequestContext.put(:change_method, AuditEvent::CHANGE_METHOD_MANAGE_TOP_CONTAINERS)
     end
+
+    AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                         AuditEvent::ROLE_OBJECT => ids.map{|id| JSONModel(:top_container).uri_for(id, :repo_id => RequestContext.get(:repo_id))})
   end
 
   def self.batch_update(ids, fields)
