@@ -229,7 +229,9 @@ class AuditEvent
         record_ids = audit_page.event_ids
 
         # {id: {role: uri}
-        record_uris = DB.open do |db|
+        record_uri_for_id = {}
+
+        DB.open do |db|
           model = ASModel.all_models.find {|model|
             jsonmodel = model.my_jsonmodel(true)
             jsonmodel && jsonmodel.record_type == record_type
@@ -238,20 +240,61 @@ class AuditEvent
           raise "Model not found for #{record_type}" unless model
 
           if audit_page.page[:bulk_object_repo_id]
-            record_ids.map {|record_id|
-              [record_id, {AuditEvent::ROLE_OBJECT => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_object_repo_id]),
-                           AuditEvent::ROLE_TARGET => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_target_repo_id])}]
-            }.to_h
+            # Bulk transfers give us all the repository information we need in
+            # the audit page itself, so constructing the URI is straightforward.
+            record_ids.each do |record_id|
+              record_uri_for_id[record_id] = {
+                AuditEvent::ROLE_OBJECT => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_object_repo_id]),
+                AuditEvent::ROLE_TARGET => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_target_repo_id])
+              }
+            end
           else
-            model.any_repo.filter(id: record_ids).map {|record|
+            # Other bulk pages tell us the types and record IDs that were
+            # implicated, but it's up to us to reconstruct the URIs.  For live
+            # records, no problem, but finding the original URI of deleted
+            # records takes some extra work.
+
+            # Find the live records
+            model.any_repo.filter(id: record_ids).each do |record|
               if record.respond_to?(:repo_id)
                 RequestContext.open(repo_id: record.repo_id) do
-                  [record.id, {AuditEvent::ROLE_OBJECT => record.uri}]
+                  record_uri_for_id[record.id] = {AuditEvent::ROLE_OBJECT => record.uri}
                 end
               else
-                [record.id, {AuditEvent::ROLE_OBJECT => record.uri}]
+                record_uri_for_id[record.id] = {AuditEvent::ROLE_OBJECT => record.uri}
               end
-            }.to_h
+            end
+
+            # Anything still not found must have been deleted
+            (record_ids - record_uri_for_id.keys).each do |deleted_record_id|
+              if model.model_scope == :repository
+                # Interrogate our tombstones to find the repository of the original record.
+                db[:deleted_records].filter(:record_id => deleted_record_id).select(:uri).each do |tombstone|
+                  parsed = JSONModel.parse_reference(tombstone.fetch(:uri))
+
+                  if parsed[:type] == model.my_jsonmodel.record_type
+                    # That's us!
+                    record_uri_for_id[deleted_record_id] = {AuditEvent::ROLE_OBJECT => tombstone.fetch(:uri)}
+                    break
+                  end
+                end
+
+                if !record_uri_for_id[deleted_record_id]
+                  # This should never happen, since records either exist or
+                  # are deleted.  If we're here, someone has likely messed
+                  # directly with their database at some point.
+                  #
+                  # We'll fall back to giving out a URL that will never be
+                  # found.  Consumers of the API who try to fetch this will
+                  # get a 404, which is what they were going to get on a
+                  # deleted record anyway.
+                  record_uri_for_id[deleted_record_id] = {AuditEvent::ROLE_OBJECT => model.my_jsonmodel.uri_for(deleted_record_id, :repo_id => Repository.global_repo_id)}
+                end
+              else
+                # Global-scoped records are straightforward.
+                record_uri_for_id[deleted_record_id] = {AuditEvent::ROLE_OBJECT => model.my_jsonmodel.uri_for(deleted_record_id)}
+              end
+            end
           end
         end
 
@@ -263,7 +306,7 @@ class AuditEvent
             change_method: audit_page.page.fetch(:bulk_change_method),
             actor_name: audit_page.page.fetch(:bulk_actor_name),
             actor_type: audit_page.page.fetch(:bulk_actor_type),
-            records: record_uris.fetch(record_id).map{|role, uri| [role, record_type, uri].join(':')}.join(',')
+            records: record_uri_for_id.fetch(record_id).map{|role, uri| [role, record_type, uri].join(':')}.join(',')
           }
         }.map {|row| render(row, include_context: false)}
 

@@ -5,6 +5,7 @@ class Tombstone < Sequel::Model(:deleted_records)
 
     self.timestamp = Time.now
     self.operator = RequestContext.get(:current_username)
+    self.record_id = self.uri.gsub(%r{.*/}, '').to_i
   end
 
 end
