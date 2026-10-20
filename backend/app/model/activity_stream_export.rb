@@ -210,7 +210,7 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
     return true if record_uri.start_with?(repository_uri + '/')
 
     # check if the record was transferred into the repository
-    return true if event.fetch('target', {}).fetch('id', '').start_with?(repository_uri + '/')
+    return true if event.fetch('target', {}).fetch('id', '').include?(repository_uri + '/')
 
     # if the record is from another repository, then it is not associated
     return false if record_uri.start_with?('/repositories/')
