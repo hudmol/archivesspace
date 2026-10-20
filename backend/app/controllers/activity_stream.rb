@@ -2,7 +2,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream/object_types')
     .description("Get a list of supported object types")
-    .permissions([])
+    .permissions([:view_activity_stream])
     .params()
     .returns([200, "a list of supported object types"]) \
   do
@@ -11,7 +11,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream')
     .description("Get an OrderedCollection of events for all object types")
-    .permissions([])
+    .permissions([:view_activity_stream])
     .params()
     .returns([200, "an OrderedCollection"]) \
   do
@@ -20,7 +20,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream/page/:page')
     .description("Get a page of the activity stream")
-    .permissions([])
+    .permissions([:view_activity_stream])
     .params(["page", Integer, "The page to get"])
     .returns([200, "an OrderedCollectionPage"],
              [404, "page not available"]) \
@@ -36,7 +36,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream/event/:id')
     .description("Get an audit event by id")
-    .permissions([])
+    .permissions([:view_activity_stream])
     .params(["id", String, "The ID of the event to get"])
     .returns([200, "an audit event"],
              [404, "event not available"]) \
@@ -52,7 +52,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream/:object_type')
     .description("Get an OrderedCollection of events for object type")
-    .permissions([])
+    .permissions([:view_activity_stream])
     .params(["object_type", String, "The type of object to events for"])
     .returns([200, "an OrderedCollection"],
              [404, "unknown object type"]) \
@@ -66,7 +66,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream/:object_type/page/:page')
     .description("Get a page of the activity stream for object type")
-    .permissions([])
+    .permissions([:view_activity_stream])
     .params(["object_type", String, "The type of object to events for"],
             ["page", Integer, "The page to get"])
     .returns([200, "an OrderedCollectionPage"],
@@ -87,7 +87,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream-export')
     .description("List all activity stream export jobs")
-    .permissions([]) # FIXME add read permission
+    .permissions([:view_activity_stream])
     .paginated(true)
     .returns([200, "List of export jobs"]) \
   do
@@ -96,7 +96,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.post('/repositories/:repo_id/activity-stream-export/create')
     .description("Create a new activity stream export job")
-    .permissions([]) # FIXME add read permission
+    .permissions([:view_activity_stream])
     .params(["repo_id", :repo_id],
             ["export_type", String, "The type of export to create"],
             ["criteria", String, "The criteria for the export", body: true])
@@ -137,7 +137,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream-export/:id')
    .description("Fetch an activity stream export")
-   .permissions([]) # FIXME add read permission
+   .permissions([:view_activity_stream])
    .params(["id", Integer, "The ID of the export"]) \
    .returns([200, "Export json"]) \
   do
@@ -146,7 +146,7 @@ class ArchivesSpaceService < Sinatra::Base
 
   Endpoint.get('/activity-stream-export/:id/download')
     .description("Download an activity stream export")
-    .permissions([]) # FIXME add read permission
+    .permissions([:view_activity_stream])
     .params(["id", Integer, "The ID of the export to download"]) \
     .returns([200, "Stream the activity stream export"]) \
   do

@@ -1932,6 +1932,8 @@ en:
       manage_assessment_attributes: create/update/delete <b>repository assessment attributes definitions</b> (in this repository)
       manage_enumeration_record: create/update/delete <b>controlled values</b> (system-wide)
       manage_custom_report_templates: create/update/delete <b>custom report templates</b> (in this repository)
+      readonly_activity_stream: view the <strong>activity stream API</strong> or generate activity stream exports
+      admin_activity_stream: manage the <strong>activity stream</strong>
     _singular: Group
     _plural: Groups
 

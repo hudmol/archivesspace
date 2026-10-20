@@ -1,6 +1,8 @@
 class ActivityStreamExportRunner < JobRunner
-  # FIXME add create_permissions
-  register_for_job_type('activity_stream_export_job', hidden: true)
+  register_for_job_type('activity_stream_export_job',
+                        create_permissions: [:view_activity_stream],
+                        cancel_permissions: [:view_activity_stream],
+                        hidden: true)
 
   def run
     file = nil

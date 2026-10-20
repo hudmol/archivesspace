@@ -1,9 +1,8 @@
 class ActivityStreamController < ApplicationController
-  # FIXME permissions
-  set_access_control 'view_repository' => [:admin,
-                                           :exports,
-                                           :export_create,
-                                           :export_download]
+  set_access_control 'view_activity_stream' => [:exports,
+                                                :export_create,
+                                                :export_download]
+  set_access_control 'manage_activity_stream' => [:admin]
 
   def admin
   end

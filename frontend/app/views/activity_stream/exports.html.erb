@@ -13,7 +13,9 @@
       <div class="tabbable">
         <ul class="nav nav-tabs">
           <li class="active nav-item"><a class="active nav-link" href="javascript:void(0)"><%= t('activity_stream._frontend.exports_tab') %></a></li>
+          <% if user_can?('manage_activity_stream') %>
           <li class="nav-item"><a class="nav-link" href="<%= url_for(:controller => :activity_stream, :action => :admin) %>"><%= t('activity_stream._frontend.admin_tab') %></a></li>
+          <% end %>
         </ul>
         <div class="tab-content">
           <div class="tab-pane active">

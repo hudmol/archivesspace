@@ -308,6 +308,24 @@ class ArchivesSpaceService
                       "The ability to manage custom report templates",
                       :level => "repository")
 
+    Permission.define("readonly_activity_stream",
+                      "The ability to access the activity stream API or generate activity stream exports",
+                      :level => "repository")
+
+    Permission.define("view_activity_stream",
+                      "The ability to access the activity stream API or generate activity stream exports",
+                      :implied_by => 'readonly_activity_stream',
+                      :level => "global")
+
+    Permission.define("admin_activity_stream",
+                      "The ability to administer the activity stream",
+                      :level => "repository")
+
+    Permission.define("manage_activity_stream",
+                      "The ability to administer the activity stream",
+                      :implied_by => 'admin_activity_stream',
+                      :level => "global")
+
     # Permissions that are added to standard-issue groups will not apply
     # to existing repositories in legacy databases unless we do something about
     # it. Doing it here is much simpler than writing up a migration, but of course
