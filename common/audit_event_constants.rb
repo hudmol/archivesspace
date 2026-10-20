@@ -14,6 +14,7 @@ class AuditEvent
      OBJECT_TYPE_CONTAINER_PROFILE = 11,
      OBJECT_TYPE_SUBJECT = 12,
      OBJECT_TYPE_CLASSIFICATION = 13,
+     OBJECT_TYPE_CLASSIFICATION_TERM = 20,
 
      OBJECT_TYPE_ACCESSION = 14,
      OBJECT_TYPE_LOCATION = 15,
@@ -38,6 +39,7 @@ class AuditEvent
      OBJECT_TYPE_CONTAINER_PROFILE => 'container_profile',
      OBJECT_TYPE_SUBJECT => 'subject',
      OBJECT_TYPE_CLASSIFICATION => 'classification',
+     OBJECT_TYPE_CLASSIFICATION_TERM => 'classification_term',
 
      OBJECT_TYPE_ACCESSION => 'accession',
      OBJECT_TYPE_LOCATION => 'location',
