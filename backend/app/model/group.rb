@@ -53,6 +53,18 @@ class Group < Sequel::Model(:group)
       end
     end
 
+    # if audit logging is enabled and user updates are logged, workout which users are affected and log events for them
+    if AppConfig[:enable_audit_logging] && AppConfig[:audit_logging_include_object_types].include?('user')
+      current_usernames = Set.new(obj.user.map {|user| user[:username] })
+      new_usernames = Set.new(json.member_usernames || [])
+      affected_usernames = (current_usernames ^ new_usernames).to_a
+
+      affected_usernames.each do |username|
+        AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                             AuditEvent::ROLE_OBJECT => User[:username => username].uri)
+      end
+    end
+
     obj.remove_all_user
     (json.member_usernames or []).map {|username|
       user = User[:username => username]
