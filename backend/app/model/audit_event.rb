@@ -82,10 +82,7 @@ class AuditEvent
     out[:method_of_change] = CHANGE_METHOD_CODE_TABLE[event[:change_method]]
 
     event[:records].each do |role, uris|
-      # Saying role.to_s.to_i because we use sybmolize_names when parsing the json from an archive page
-      # so a 2 becomes :"2". You can't go straight from a symbol to an int, so here we are.
-      # And of course it's a no-op if role is an int in the first place.
-      role_label = ROLE_CODE_TABLE.fetch(role.to_s.to_i)
+      role_label = ROLE_CODE_TABLE.fetch(role)
       out[role_label] = uris.map{|uri|
         {
           :id => archivesspace_uri(uri[:uri]),

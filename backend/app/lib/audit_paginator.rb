@@ -62,11 +62,31 @@ class AuditPaginator
         event[:timestamp] = DateTime.parse(event[:timestamp])
       end
 
+      # :symbolize_names turns a key like "1" into :"1", but our original data
+      # structure just wants a bare integer.
+      fix_integer_keys!(result)
+
       result
     end
 
     def page_type
       self.page.fetch(:page_event_type)
+    end
+
+    private
+
+    def fix_integer_keys!(elt)
+      if elt.is_a?(Array)
+        elt.each {|e| fix_integer_keys!(e)}
+      elsif elt.is_a?(Hash)
+        elt.keys.each do |key|
+          if key.to_s =~ /\A[0-9]+\z/
+            elt[Integer(key.to_s)] = elt.delete(key)
+          end
+        end
+
+        elt.values.each {|e| fix_integer_keys!(e)}
+      end
     end
   end
 
