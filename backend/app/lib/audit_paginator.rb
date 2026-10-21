@@ -430,7 +430,7 @@ class AuditPaginator
             filter = nil
           end
 
-          events = JSON.dump(AuditEvent.ds(db, nil, filter).filter(Sequel.qualify(:audit_event, :id) => ids).all)
+          events = JSON.dump(AuditEvent.find_events(db, {:object_type => filter, :event_ids => ids}))
 
           compressed = AuditPaginator.compress(events)
 

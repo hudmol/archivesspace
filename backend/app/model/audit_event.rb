@@ -5,28 +5,50 @@ class AuditEvent
   # FIXME: might need to support a proxy url
   ARCHIVESSPACE_URI = AppConfig[:backend_url]
 
-  def self.ds(db, since = nil, object_type = nil)
+  def self.find_events(db, opts = {})
     ds = db[:audit_event].left_join(:audit_record, :audit_record__audit_event_id => :audit_event__id)
-                         .group(:audit_event__id)
                          .order(Sequel.asc(:audit_event__timestamp))
 
-    unless since.nil?
-      since_time = Time.at(since)
+    if opts[:since]
+      since_time = Time.at(opts[:since])
       ds = ds.where { timestamp >= since_time }
     end
 
-    if object_type
-      ds = ds.filter(:audit_record__type => object_type)
+    if opts[:object_type]
+      ds = ds.filter(:audit_record__type => opts[:object_type])
     end
 
-    ds.select(Sequel.as(Sequel.qualify(:audit_event, :id),
-                        :event_id),
-              :timestamp,
-              :actor_name,
-              :actor_type,
-              :activity_type,
-              :change_method,
-              Sequel.function(:GROUP_CONCAT, Sequel.function(:CONCAT_WS, ":", :audit_record__role, :audit_record__type, :audit_record__uri)).as(:records))
+    if opts[:event_ids]
+      ds = ds.filter(:audit_event__id => opts[:event_ids])
+    end
+
+    ds = ds.select(Sequel.as(:audit_event__id, :event_id),
+                   :timestamp,
+                   :actor_name,
+                   :actor_type,
+                   :activity_type,
+                   :change_method,
+                   Sequel.as(:audit_record__uri, :record_uri),
+                   Sequel.as(:audit_record__type, :record_type),
+                   Sequel.as(:audit_record__role, :record_role)
+                   )
+
+    out = []
+
+    ds.each do |row|
+      record = {
+        row[:record_role] => [{:uri => row[:record_uri], :type => row[:record_type]}]
+      }
+
+      if event = out.find {|event| event[:event_id] == row[:event_id] }
+        event[:records][row[:record_role]] ||= []
+        event[:records][row[:record_role]].push(record[row[:record_role]].first)
+      else
+        out.push(row.except(:record_uri, :record_type, :record_role).merge(:records => record))
+      end
+    end
+
+    out
   end
 
   def self.archivesspace_uri(uri = '')
@@ -57,17 +79,8 @@ class AuditEvent
     out[:type] = ACTIVITY_TYPE_CODE_TABLE[event[:activity_type]]
     out[:method_of_change] = CHANGE_METHOD_CODE_TABLE[event[:change_method]]
 
-
-    records = {}
-
-    event[:records].split(',').each do |record|
-      (role, type, uri) = record.split(':')
-      records[role] ||= []
-      records[role] << {:uri => uri, :type => type}
-    end
-
-    records.each do |role, uris|
-      out[ROLE_CODE_TABLE[role.to_i]] = ASUtils.wrap(uris).map{|uri|
+    event[:records].each do |role, uris|
+      out[ROLE_CODE_TABLE[role.to_i]] = uris.map{|uri|
         {
           :id => archivesspace_uri(uri[:uri]),
           :type => uri[:type]
@@ -110,8 +123,7 @@ class AuditEvent
       # Regular single event (by id)
       DB.open do |db|
         event_id = Integer(event_id)
-
-        if (event = ds(db).filter(Sequel.qualify(:audit_event, :id) => event_id).first)
+        if (event = find_events(db, {:event_ids => event_id}).first)
           return render(event)
         elsif (archived_event = AuditPaginator.find_archived_event(db, event_id))
           return render(archived_event)
@@ -122,7 +134,7 @@ class AuditEvent
 
   def self.by_type(object_type)
     DB.open do |db|
-      ds(db, nil, object_type).map{|row| render(row)}
+      find_events(db, {:object_type => object_type}).map{|row| render(row)}
     end
   end
 
@@ -215,7 +227,7 @@ class AuditEvent
       case audit_page.page_type
       when 'audit'
         ids = audit_page.event_ids
-        out[:orderedItems] = ds(db, nil, object_type).filter(:audit_event__id => ids).map {|row|
+        out[:orderedItems] = find_events(db, {:event_ids => ids, :object_type => object_type}).map {|row|
           render(row, include_context: false)
         }
         out
@@ -299,6 +311,11 @@ class AuditEvent
         end
 
         out[:orderedItems] = record_ids.each_with_index.map {|record_id, offset|
+          records = {}
+          record_uri_for_id.fetch(record_id).each{|role, uri|
+            records[role] = [{uri: uri, type: record_type}]
+          }
+
           {
             event_id: "_blk_p#{audit_page.page.fetch(:bulk_all_stream_page_number)}o#{offset}",
             timestamp: audit_page.page.fetch(:update_time),
@@ -306,7 +323,7 @@ class AuditEvent
             change_method: audit_page.page.fetch(:bulk_change_method),
             actor_name: audit_page.page.fetch(:bulk_actor_name),
             actor_type: audit_page.page.fetch(:bulk_actor_type),
-            records: record_uri_for_id.fetch(record_id).map{|role, uri| [role, record_type, uri].join(':')}.join(',')
+            records: records
           }
         }.map {|row| render(row, include_context: false)}
 
