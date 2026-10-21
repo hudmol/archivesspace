@@ -129,6 +129,7 @@ describe 'AuditEvent model' do
   it 'returns an empty ordered collection when there are no audit events' do
     $testdb[:audit_record].delete
     $testdb[:audit_event].delete
+    $testdb[:audit_page].delete
 
     response = AuditEvent.activity_stream
 
