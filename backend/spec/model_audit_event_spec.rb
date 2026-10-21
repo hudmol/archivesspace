@@ -98,9 +98,9 @@ describe 'AuditEvent model' do
                                    :actor_type => AuditEvent::ACTOR_TYPE_PERSON,
                                    :activity_type => AuditEvent::ACTIVITY_TYPE_MOVE,
                                    :change_method => AuditEvent::CHANGE_METHOD_API,
-                                   :records => "#{AuditEvent::ROLE_OBJECT}:resource:#{@resource.uri}," \
-                                               "#{AuditEvent::ROLE_OBJECT}:resource:#{@another_resource.uri}," \
-                                               "#{AuditEvent::ROLE_TARGET}:resource:#{@resource.uri}"
+                                   :records => {AuditEvent::ROLE_OBJECT => [{type: 'resource', uri: @resource.uri},
+                                                                            {type: 'resource', uri: @another_resource.uri}],
+                                                AuditEvent::ROLE_TARGET => [{type: 'resource', uri: @resource.uri}]}
                                  })
 
     expect(rendered[:type]).to eq('Move')
@@ -115,8 +115,9 @@ describe 'AuditEvent model' do
                                    :actor_type => AuditEvent::ACTOR_TYPE_PERSON,
                                    :activity_type => AuditEvent::ACTIVITY_TYPE_MOVE,
                                    :change_method => AuditEvent::CHANGE_METHOD_API,
-                                   :records => "#{AuditEvent::ROLE_OBJECT}:resource:#{@resource.uri}," \
-                                               "#{AuditEvent::ROLE_TARGET}:resource:#{@resource.uri}"
+                                   :records => {AuditEvent::ROLE_OBJECT => [{type: 'resource', uri: @resource.uri}],
+                                                AuditEvent::ROLE_TARGET => [{type: 'resource', uri: @resource.uri}]}
+
                                  })
 
     expect(rendered[:type]).to eq('Move')

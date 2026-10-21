@@ -82,7 +82,8 @@ class AuditEvent
     out[:method_of_change] = CHANGE_METHOD_CODE_TABLE[event[:change_method]]
 
     event[:records].each do |role, uris|
-      out[ROLE_CODE_TABLE[role.to_i]] = uris.map{|uri|
+      role_label = ROLE_CODE_TABLE[role]
+      out[role_label] = uris.map{|uri|
         {
           :id => archivesspace_uri(uri[:uri]),
           :type => uri[:type]
@@ -90,7 +91,7 @@ class AuditEvent
       }
 
       if uris.length == 1
-        out[ROLE_CODE_TABLE[role.to_i]] = out[ROLE_CODE_TABLE[role.to_i]].first
+        out[role_label] = out[role_label].first
       end
     end
 
