@@ -7,7 +7,7 @@ class AuditEvent
 
   def self.find_events(db, opts = {})
     ds = db[:audit_event].left_join(:audit_record, :audit_record__audit_event_id => :audit_event__id)
-                         .order(Sequel.asc(:audit_event__timestamp))
+                         .order(Sequel.asc(:audit_event__timestamp), Sequel.asc(:audit_event__id))
 
     if opts[:since]
       since_time = Time.at(opts[:since])
@@ -36,13 +36,15 @@ class AuditEvent
     out = []
 
     ds.each do |row|
+      last_out = out.last
+
       record = {
         row[:record_role] => [{:uri => row[:record_uri], :type => row[:record_type]}]
       }
 
-      if event = out.find {|event| event[:event_id] == row[:event_id] }
-        event[:records][row[:record_role]] ||= []
-        event[:records][row[:record_role]].push(record[row[:record_role]].first)
+      if last_out && last_out[:event_id] == row[:event_id]
+        last_out[:records][row[:record_role]] ||= []
+        last_out[:records][row[:record_role]].push(record[row[:record_role]].first)
       else
         out.push(row.except(:record_uri, :record_type, :record_role).merge(:records => record))
       end
