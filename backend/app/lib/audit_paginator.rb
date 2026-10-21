@@ -102,7 +102,7 @@ class AuditPaginator
     return nil
   end
 
-  BulkIDConsumer = Struct.new(:timestamp, :record_type, :record_type_code, :activity_type, :change_method, :actor_type, :actor_name, :object_repo, :target_repo) do
+  BulkIDConsumer = Struct.new(:timestamp, :record_type, :record_type_code, :activity_type, :change_method, :actor_type, :actor_name, :object_repo, :target_repo, :system_generated) do
     def initialize(*)
       super
 
@@ -195,7 +195,9 @@ class AuditPaginator
 
               # Note: requirement that we process ANY_TYPE first because we
               # depend on its page for subsequent inserts.
-              bulk_all_stream_page_number: new_pages.fetch(ANY_TYPE)
+              bulk_all_stream_page_number: new_pages.fetch(ANY_TYPE),
+
+              system_generated: self.system_generated,
             )
           end
         end
@@ -229,7 +231,7 @@ class AuditPaginator
     end
   end
 
-  def self.add_bulk_events(timestamp:, record_type:, activity_type:, change_method:, actor_type:, actor_name:, object_repo:, target_repo:)
+  def self.add_bulk_events(timestamp:, record_type:, activity_type:, change_method:, actor_type:, actor_name:, object_repo:, target_repo:, system_generated:)
     unless AuditEvent::OBJECT_TYPE_CODE_TABLE.has_key?(record_type)
       raise "Unsupported audit event record type: #{record_type}"
     end
@@ -254,7 +256,8 @@ class AuditPaginator
                                      actor_type,
                                      actor_name,
                                      object_repo,
-                                     target_repo)
+                                     target_repo,
+                                     system_generated)
     id_consumer.transaction do
       yield id_consumer
       id_consumer.flush(:force)
@@ -283,7 +286,8 @@ class AuditPaginator
           actor_type: AuditEvent::ACTOR_TYPE_APPLICATION,
           actor_name: 'admin',
           object_repo: nil,
-          target_repo: nil
+          target_repo: nil,
+          system_generated: 1
         ) do |events|
           begin
             min_id = model.min(:id)
@@ -331,7 +335,8 @@ class AuditPaginator
                                    actor_type: AuditEvent::ACTOR_TYPE_PERSON,
                                    actor_name: RequestContext.get(:current_username),
                                    object_repo: source_repo_id,
-                                   target_repo: target_repo_id
+                                   target_repo: target_repo_id,
+                                   system_generated: 0
                                    ) do |events|
       begin
         model.filter(:repo_id => source_repo_id).map(:id).each do |record_id|
@@ -364,6 +369,7 @@ class AuditPaginator
       actor_name: RequestContext.get(:current_username),
       object_repo: nil,
       target_repo: nil,
+      system_generated: 0,
     ) do |events|
       begin
         record_ids.each do |record_id|

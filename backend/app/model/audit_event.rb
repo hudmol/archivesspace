@@ -191,7 +191,7 @@ class AuditEvent
     end
   end
 
-  def self.page(page, object_type = nil)
+  def self.page(page, object_type = nil, opts = {})
     DB.open do |db|
       uri = activity_stream_uri
       if object_type
@@ -201,6 +201,8 @@ class AuditEvent
       audit_page = AuditPaginator.get_page(db, page, object_type)
 
       return nil unless audit_page
+
+      return nil if opts.fetch(:exclude_system_generated, false) && audit_page.page[:system_generated] == 1
 
       out = {
         '@context' => W3C_URL,

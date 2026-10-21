@@ -80,8 +80,12 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
 
     page = 1
     while page <= stream_stats.last_page do
-      # pp "** PROCESSING PAGE #{page} of #{stream_stats.last_page} **"
-      AuditEvent.page(page, nil).fetch(:orderedItems).each do |event|
+      current_page = AuditEvent.page(page, nil, exclude_system_generated: true)
+
+      # Skip system pages
+      next if current_page.nil?
+
+      current_page.fetch(:orderedItems).each do |event|
         event = deep_keys_as_strings(event)
 
         ASUtils.wrap(event.fetch('object')).each do |event_record|

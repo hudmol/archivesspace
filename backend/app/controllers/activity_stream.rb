@@ -170,7 +170,7 @@ class ArchivesSpaceService < Sinatra::Base
     .permissions([:manage_activity_stream])
     .returns([200, "Reset the activity stream"]) \
   do
-      AuditEvent.reset_feed!
+      AuditPaginator.mark_everything_updated!
       json_response({'status' => 'success'})
   end
 end
