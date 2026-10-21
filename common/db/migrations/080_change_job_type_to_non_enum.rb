@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:job) do
       add_column(:job_type, String, :null => false, :default => 'unknown_job_type')

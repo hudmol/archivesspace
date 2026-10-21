@@ -167,50 +167,6 @@ module Sequel
       include SequelColumnTypes
     end
   end
-
-  class SimpleMigration
-    attr_accessor :audit_events_logged
-    attr_accessor :no_audit_events_required
-
-    alias_method :pre_audit_event_initialize, :initialize
-
-    def initialize
-      pre_audit_event_initialize
-
-      @audit_events_logged = false
-      @no_audit_events_required = false
-    end
-
-    alias_method :pre_audit_event_apply, :apply
-
-    def apply(db, direction)
-      pre_audit_event_apply(db, direction)
-
-      if AppConfig[:enable_audit_logging]
-        if no_audit_events_required
-          $stderr.puts("Migration asserts that no audit events are required")
-        elsif audit_events_logged
-          # good!
-        else
-          raise "Audit logging is enabled so all migrations must log audit events or assert that none are       !!\n" +
-                "required. This migration does neither. To assert that none are required, add a line to the     !!\n" +
-                "migration like this:                                                                           !!\n" +
-                "    Sequel.migration do                                                                        !!\n" +
-                "      no_audit_events_required!                                                                !!\n"
-         end
-      end
-    end
-  end
-
-  class MigrationDSL
-    def no_audit_events_required!
-      self.migration.no_audit_events_required = true
-    end
-
-    def audit_events_logged!
-      self.migration.audit_events_logged = true
-    end
-  end
 end
 
 

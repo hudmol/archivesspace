@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:top_container) do
       add_column(:created_for_collection, String, :null => true)

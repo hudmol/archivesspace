@@ -2,8 +2,6 @@ require_relative 'utils'
 
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     create_editable_enum('metadata_license', %w(public_domain non_commercial non_commercial_no_derivatives no_derivatives share_a_like non_commercial_share_a_like))
     create_table(:metadata_rights_declaration) do

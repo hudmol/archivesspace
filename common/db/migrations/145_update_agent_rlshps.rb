@@ -22,8 +22,6 @@ existing_relators = %w[is_associative_with
                        is_related_with]
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     # Add new enum for specific relationship
     create_editable_enum('agent_relationship_specific_relator', [])

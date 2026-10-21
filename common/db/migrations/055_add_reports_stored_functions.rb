@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
       # there is nothing to see here
       # once there were many mysql stored procedures

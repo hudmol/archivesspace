@@ -1,8 +1,6 @@
 require 'db/migrations/utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
 
     begin

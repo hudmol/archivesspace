@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:deleted_records) do
       add_column(:record_id, Integer)

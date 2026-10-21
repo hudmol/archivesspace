@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     create_table(:custom_report_template) do
       primary_key :id

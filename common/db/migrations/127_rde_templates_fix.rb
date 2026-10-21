@@ -2,8 +2,6 @@ require_relative 'utils'
 require 'json'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     self[:rde_template].each do |template|
       RDETemplateFix::CONFIG[:field_updates].each do |field, type|

@@ -1,8 +1,6 @@
 require 'db/migrations/utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     $stderr.puts("Populate OAI set fields with default values")
     alter_table(:oai_config) do

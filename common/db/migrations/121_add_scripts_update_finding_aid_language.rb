@@ -2,8 +2,6 @@ require_relative 'utils'
 require 'nokogiri'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
 
     # If finding_aid_language_note contains encoded <language> tags with valid langcode and/or scriptcode create a finding_aid_language and/or finding_aid_script

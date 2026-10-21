@@ -123,8 +123,6 @@ def migrate_langmaterial_notes
 end
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
 
     create_table(:lang_material) do

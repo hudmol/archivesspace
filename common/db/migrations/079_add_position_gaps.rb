@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:archival_object) do
       drop_index([:parent_name, :position], :unique => true, :name => "uniq_ao_pos")

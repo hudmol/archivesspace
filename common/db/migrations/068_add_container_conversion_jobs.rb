@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     enum = self[:enumeration].filter(:name => "job_type").select(:id)
 

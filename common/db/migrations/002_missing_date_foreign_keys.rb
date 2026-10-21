@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:date) do
       add_foreign_key([:agent_person_id], :agent_person, :key => :id, :name => 'agent_person_date_fk')

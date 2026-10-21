@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     $stderr.puts("Add active status to user")
     alter_table(:user) do

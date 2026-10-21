@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     self.transaction do
       create_job_id = self[:permission].where(:permission_code => 'create_job').first[:id]

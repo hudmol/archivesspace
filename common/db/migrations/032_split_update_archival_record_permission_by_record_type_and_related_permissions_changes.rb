@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     update_archival_record_permission_id = self[:permission].filter(:permission_code => 'update_archival_record').get(:id)
 

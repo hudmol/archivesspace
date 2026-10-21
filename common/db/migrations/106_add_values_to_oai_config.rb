@@ -4,8 +4,6 @@ require_relative 'utils'
 # resources, accessions, and digital objects
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     $stderr.puts("Adding values OAI config table")
     oai_repository_name = AppConfig.has_key?(:oai_repository_name) ? AppConfig[:oai_repository_name] : 'ArchivesSpace OAI Provider'

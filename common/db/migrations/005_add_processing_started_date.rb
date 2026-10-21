@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:collection_management) do
       add_column(:processing_started_date, Date, :null => true)

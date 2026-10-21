@@ -93,8 +93,6 @@ def create_event_from_collection_management(dataset, event_type)
 end
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     # turn cataloged note into an event with type = cataloged
     create_event_from_collection_management( self[:collection_management].filter( Sequel.~(:cataloged_note => nil) ), "cataloged")

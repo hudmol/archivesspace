@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     $stderr.puts("add 'ingest' to name_source")
     enum, value = "name_source", "ingest"

@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     $stderr.puts "Creating new database tables for new agents functionality"
     create_table(:agent_record_control) do

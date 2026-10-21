@@ -8,8 +8,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
 
     record_type_to_id_map = {}

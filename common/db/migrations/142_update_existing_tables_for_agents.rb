@@ -26,8 +26,6 @@ def migrate_contact_notes(ac_notes)
 end
 
 Sequel.migration do
-  no_audit_events_required!
-
   $stderr.puts "Creating new agents tables"
   up do
     alter_table(:name_family) do

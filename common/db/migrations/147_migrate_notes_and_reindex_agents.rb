@@ -3,8 +3,6 @@ require 'json'
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     reindex_types = [:agent_person, :agent_software, :agent_family,
                      :agent_corporate_entity]

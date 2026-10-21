@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   # sometimes is snows in April. Sometimes instances lose their containers.
   # This is rare but we should remove them here, since this might cause prob
   # with TC conversion..

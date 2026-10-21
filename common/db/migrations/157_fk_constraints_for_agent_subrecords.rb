@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     # delete agent subrecord / subject relationships where the subject has been deleted
     [:subject_agent_subrecord_rlshp, :subject_agent_subrecord_place_rlshp].each do |table|

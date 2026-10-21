@@ -3,8 +3,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     warn('Adding note to Container Profile')
     alter_table(:container_profile) do

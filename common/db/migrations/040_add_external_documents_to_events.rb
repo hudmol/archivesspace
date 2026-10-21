@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:external_document) do
       add_column( :event_id, :integer, :null => true )

@@ -676,8 +676,6 @@ def coerce_timestamp(timestamp)
 end
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     # backup! just. in. case.
     backup_rights_statement_table

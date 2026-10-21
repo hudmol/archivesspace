@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
 
     qaa = self[:enumeration_value].filter(:value => 'qaa-qtz').select(:id)

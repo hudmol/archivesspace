@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     create_table(:default_values) do
       Integer :lock_version, :default => 0, :null => false

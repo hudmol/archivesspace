@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     term = "record_keeping"
     enum = self[:enumeration].filter(:name => 'date_label').select(:id).first[:id]

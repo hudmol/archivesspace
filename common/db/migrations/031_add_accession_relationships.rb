@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     create_enum("accession_parts_relator", ["has_part", "forms_part_of"])
     create_editable_enum("accession_parts_relator_type", ["part"])

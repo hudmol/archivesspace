@@ -18,13 +18,14 @@ decisions. It also provides some guidance on configuration and testing.
 ## Database migrations
 
 There are database migrations required for this functionality. The migrations
-add four new tables. No existing table definitions or data are changed by the
+add five new tables. No existing table definitions or data are changed by the
 migrations. The new tables are:
 ```
+audit_enabled_tracking
 audit_event
-audit_record
 audit_page
 audit_page_lock
+audit_record
 ```
 
 
@@ -364,7 +365,15 @@ Archiving a page of activities should reduce the storage required by
 about 95%, and our testing suggests that storing 100 million archived
 events should consume about 350MB of database storage.
 
-## Enforcing audit logging in Migrations
+## Audit logging and Database Migrations
 
-To be discussed
+We investigated enforing the logging of audit events in database migrations.
+We discovered that, while it is technically feasible, the burden on people
+writing migrations is unnecessarily onerous, and the potential for error is
+significant.
 
+As a result the decision is to not require audit logging in database migrations.
+Instead, there is a facility, in the staff UI, to generate a complete set of
+bulk audit events by object type, or for all object types. This allows users
+with the necessary permissions to trigger a resync from external systems thus
+picking up any changes from a database migration.

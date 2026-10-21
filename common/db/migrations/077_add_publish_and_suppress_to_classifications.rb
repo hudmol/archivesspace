@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:classification) do
       add_column(:publish, Integer, :default => 1)

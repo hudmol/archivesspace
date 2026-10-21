@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     # FIXME REMOVE EVENTUALLY - this is required to clear old test data while in the QA acceptance phase.
     self.transaction do

@@ -21,8 +21,6 @@ def convert_blob(old_blob, record_type)
 end
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     self[:required_fields].each do |row|
       old_required_blob = JSON.parse(row[:blob])

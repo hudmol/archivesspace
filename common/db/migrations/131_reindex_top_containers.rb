@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     self.transaction do
       # reindex all top_container records in response ANW-462 changes to long_display_string

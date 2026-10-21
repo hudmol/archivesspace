@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     [:file_version, :instance].each do |table|
       alter_table(table) do

@@ -2,8 +2,6 @@ require_relative 'utils'
 require 'digest/sha1'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
 
     # add a location_hash column

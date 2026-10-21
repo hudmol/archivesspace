@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   $stderr.puts("Creating Permission and Group for Show Full Agents")
 
   up do

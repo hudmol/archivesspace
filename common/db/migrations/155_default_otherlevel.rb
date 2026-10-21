@@ -1,8 +1,6 @@
 require_relative 'utils'
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     # If a nil 'other_level' has snuck through with a level of 'otherlevel' then we need to find and set a default 'other_level' since we're now enforcing the other_level requirement
     otherlevel = self[:enumeration_value].filter(:value => 'otherlevel').select(:id)

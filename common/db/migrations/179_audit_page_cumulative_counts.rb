@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:audit_page) do
       add_column(:cumulative_prior_event_count, Integer, :unsigned => true, :null => true)

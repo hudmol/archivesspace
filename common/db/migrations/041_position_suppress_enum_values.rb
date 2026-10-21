@@ -2,8 +2,6 @@ require_relative 'utils'
 
 
 Sequel.migration do
-  no_audit_events_required!
-
   up do
 
     auto_increment_opts = self.database_type == :derby ? { :default => 0 } : { :auto_increment => true, :default => 0 }

@@ -1,6 +1,4 @@
 Sequel.migration do
-  no_audit_events_required!
-
   up do
     alter_table(:audit_page) do
       add_column(:bulk_all_stream_page_number, Integer, :null => true)
