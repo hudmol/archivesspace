@@ -77,7 +77,8 @@ describe 'AuditEvent model' do
                                    :actor_type => AuditEvent::ACTOR_TYPE_PERSON,
                                    :actor_name => actor_name,
                                    :object_repo => nil,
-                                   :target_repo => nil) do |consumer|
+                                   :target_repo => nil,
+                                   :system_generated => 0) do |consumer|
       top_container_ids.each do |id|
         consumer << id
       end
@@ -578,7 +579,9 @@ describe 'AuditEvent model' do
       top_container = create(:json_top_container)
       audit_calls = capture_log_event_calls
 
-      TopContainer.log_audit_event_for_batch([top_container.id])
+      RequestContext.open(change_method: AuditEvent::CHANGE_METHOD_API) do
+        TopContainer.log_audit_event_for_batch([top_container.id])
+      end
 
       expect(audit_calls.length).to eq(1)
       expect(audit_calls[0][:activity_type]).to eq(AuditEvent::ACTIVITY_TYPE_UPDATE)
