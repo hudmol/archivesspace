@@ -164,4 +164,13 @@ class ArchivesSpaceService < Sinatra::Base
       raise NotFoundException.new("Export job not found")
     end
   end
+
+  Endpoint.post('/activity-stream/reset_feed')
+    .description("Reset the activity stream")
+    .permissions([:manage_activity_stream])
+    .returns([200, "Reset the activity stream"]) \
+  do
+      AuditEvent.reset_feed!
+      json_response({'status' => 'success'})
+  end
 end

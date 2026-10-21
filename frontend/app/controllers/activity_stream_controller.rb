@@ -2,7 +2,8 @@ class ActivityStreamController < ApplicationController
   set_access_control 'view_activity_stream' => [:exports,
                                                 :export_create,
                                                 :export_download]
-  set_access_control 'manage_activity_stream' => [:admin]
+  set_access_control 'manage_activity_stream' => [:admin,
+                                                  :reset_feed]
 
   def admin
   end
@@ -52,5 +53,16 @@ class ActivityStreamController < ApplicationController
     else
       raise RecordNotFound.new
     end
+  end
+
+  def reset_feed
+    response = JSONModel::HTTP.post_form("/activity-stream/reset_feed")
+    if response.code == '200'
+      flash[:success] = "Activity stream feed reset successfully."
+    else
+      flash[:error] = "Activity stream failed to reset."
+    end
+
+    redirect_to :action => :admin
   end
 end

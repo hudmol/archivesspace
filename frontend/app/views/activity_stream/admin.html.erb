@@ -7,6 +7,7 @@
     <div class="record-pane">
       <h2><%= t("navbar.manage_activity_stream") %></h2>
       <br>
+      <%= render_aspace_partial :partial => "shared/flash_messages" %>
       <div class="tabbable">
         <ul class="nav nav-tabs">
           <li class="nav-item"><a class="nav-link" href="<%= url_for(:controller => :activity_stream, :action => :exports) %>"><%= t('activity_stream._frontend.exports_tab') %></a></li>
@@ -14,8 +15,22 @@
         </ul>
         <div class="tab-content">
           <div class="tab-pane active">
-            <br>
-            <p>FIXME Admin actions go here.</p>
+            <section class="subrecord-form">
+                <h3><%= t("activity_stream._frontend.reset_feed") %></h3>
+                <div class="subrecord-form-container">
+                  <div class="subrecord-form-fields">
+                    <%= t("activity_stream._frontend.reset_feed_information") %>
+                    <%= button_confirm_action(
+                        t("activity_stream._frontend.reset_feed"),
+                        url_for(:controller => :activity_stream, :action => :reset_feed),
+                        {
+                          :class => "btn btn-sm btn-danger"
+                        }
+                      )
+                    %>
+                  </div>
+                </div>
+            </section>
           </div>
         </div>
       </div>

@@ -320,6 +320,7 @@ ArchivesSpace::Application.routes.draw do
     match 'activity_stream/exports' => 'activity_stream#exports', via: [:get]
     match 'activity_stream/exports/create' => 'activity_stream#export_create', via: [:post]
     match 'activity_stream/exports/:id/download' => 'activity_stream#export_download', via: [:get]
+    match 'activity_stream/reset_feed' => 'activity_stream#reset_feed', via: [:post]
 
     if Plugins.system_menu_items?
       scope '/plugins' do
