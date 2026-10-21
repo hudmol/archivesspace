@@ -134,12 +134,6 @@ class AuditEvent
     end
   end
 
-  def self.by_type(object_type)
-    DB.open do |db|
-      find_events(db, {:object_type => object_type}).map{|row| render(row)}
-    end
-  end
-
   def self.object_type_codes
     @included_object_types = AuditEvent::OPTIONAL_OBJECT_TYPES.select{|oot|
       AppConfig[:audit_logging_include_object_types].include?(AuditEvent::OBJECT_TYPE_CODE_TABLE[oot])
