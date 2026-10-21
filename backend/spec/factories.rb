@@ -192,5 +192,22 @@ FactoryBot.define do
       root_record_id { nil }
       parent_id { nil }
     end
+
+    factory :json_activity_stream_export do
+      json_schema_version { 1 }
+      export_type { ActivityStreamExport::EXPORT_TYPE_USER }
+      status { ActivityStreamExport::EXPORT_STATUS_QUEUED }
+      criteria { generate(:json_activity_stream_export_criteria) }
+    end
+
+    factory :json_activity_stream_export_criteria do
+      json_schema_version { 1 }
+      from_date { generate(:yyyy_mm_dd) }
+      to_date { generate(:yyyy_mm_dd) }
+    end
+
+    factory :json_activity_stream_export_job do
+      json_schema_version { 1 }
+    end
   end
 end
