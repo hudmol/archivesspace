@@ -18,11 +18,12 @@ decisions. It also provides some guidance on configuration and testing.
 ## Database migrations
 
 There are database migrations required for this functionality. The migrations
-add five new tables. No existing table definitions or data are changed by the
+add new tables. No existing table definitions or data are changed by the
 migrations. The new tables are:
 ```
 audit_enabled_tracking
 audit_event
+audit_export
 audit_page
 audit_page_lock
 audit_record
