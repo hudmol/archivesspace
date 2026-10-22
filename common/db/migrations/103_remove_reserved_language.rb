@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
 
     qaa = self[:enumeration_value].filter(:value => 'qaa-qtz').select(:id)

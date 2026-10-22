@@ -676,6 +676,7 @@ def coerce_timestamp(timestamp)
 end
 
 Sequel.migration do
+
   up do
     # backup! just. in. case.
     backup_rights_statement_table

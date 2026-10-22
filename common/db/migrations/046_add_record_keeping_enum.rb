@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     term = "record_keeping"
     enum = self[:enumeration].filter(:name => 'date_label').select(:id).first[:id]

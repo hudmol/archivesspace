@@ -1,4 +1,5 @@
 Sequel.migration do
+
   up do
     alter_table(:classification_term) do
       TextField :display_string, :null => true

@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     $stderr.puts("Fixing digital_object enumeration value for instance_type - make sure it's there and make it readonly")
 

@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     create_table(:assessment) do
       primary_key :id

@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     alter_table(:container) do
       set_column_allow_null :type_1_id

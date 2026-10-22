@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     create_table(:required_fields) do
       Integer :lock_version, :default => 0, :null => false

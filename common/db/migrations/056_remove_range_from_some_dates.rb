@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
 
     enum = self[:enumeration].filter(:name => 'date_type').get(:id)

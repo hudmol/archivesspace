@@ -67,6 +67,7 @@ def calculate_hash(db, table, row)
 end
 
 Sequel.migration do
+
   AGENT_TABLES = [:agent_person, :agent_corporate_entity, :agent_family, :agent_software]
 
   up do

@@ -1,6 +1,7 @@
 require 'db/migrations/utils'
 
 Sequel.migration do
+
   up do
 
     if AppConfig[:plugins].include?("container_management")

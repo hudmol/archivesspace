@@ -6,6 +6,7 @@ require 'db/migrations/utils'
 # PIA when trying to delete repos. Let's delete those on cascade.
 #
 Sequel.migration do
+
   up do
 
     alter_table(:job) do

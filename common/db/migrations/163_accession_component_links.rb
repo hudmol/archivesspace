@@ -1,6 +1,7 @@
 require 'db/migrations/utils'
 
 Sequel.migration do
+
   up do
     # users of the as_accession_links plugin will already
     # have this table. See https://github.com/hudmol/as_accession_links

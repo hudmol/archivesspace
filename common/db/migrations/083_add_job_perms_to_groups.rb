@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     self.transaction do
       create_job_id = self[:permission].where(:permission_code => 'create_job').first[:id]

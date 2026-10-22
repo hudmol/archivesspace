@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     [:agent_person, :agent_software, :agent_corporate_entity,
      :agent_family, :subject].each do |table|

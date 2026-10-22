@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     create_table(:custom_report_template) do
       primary_key :id

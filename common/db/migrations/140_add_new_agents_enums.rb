@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     $stderr.puts "Adding enumerations and values for new agents functionality"
 

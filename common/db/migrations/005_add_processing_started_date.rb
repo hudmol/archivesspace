@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     alter_table(:collection_management) do
       add_column(:processing_started_date, Date, :null => true)

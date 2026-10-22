@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     create_table(:subnote_metadata) do
       primary_key :id

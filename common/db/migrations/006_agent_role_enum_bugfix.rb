@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     enum = self[:enumeration].filter(:name => 'linked_agent_role').select(:id)
     enumeration_values = self[:enumeration_value].filter(:enumeration_id => enum).all

@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
 
     $stderr.puts("Adding updated ISO 639-2 language codes as of 2018-11-30")

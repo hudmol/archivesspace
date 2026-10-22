@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     now = Time.now
     [:accession, :archival_object, :resource].each do |table|

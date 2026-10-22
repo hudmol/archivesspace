@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     alter_table(:user_defined) do
       [:enum_1_id, :enum_2_id, :enum_3_id, :enum_4_id].each do |enum|

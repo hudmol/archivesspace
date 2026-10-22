@@ -1,4 +1,5 @@
 Sequel.migration do
+
   up do
     alter_table(:external_document) do
       add_column( :assessment_id, :integer, :null => true )

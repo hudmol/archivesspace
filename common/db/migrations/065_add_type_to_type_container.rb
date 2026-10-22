@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     alter_table(:top_container) do
       add_column( :type_id, :integer, :null => true )

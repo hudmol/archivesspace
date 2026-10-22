@@ -5,6 +5,7 @@ REVIEWED_LIST = {"accession_acquisition_type"=>"1", "accession_parts_relator"=>"
 
 
 Sequel.migration do
+
   up do
     $stderr.puts "UPDATING OUR CONTROLLED VALUE LISTS..."
     REVIEWED_LIST.each_pair do |list, val|

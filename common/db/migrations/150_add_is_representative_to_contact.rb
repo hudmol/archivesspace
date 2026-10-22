@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     alter_table(:agent_contact) do
       add_column(:is_representative, Integer, :null => true, :default => nil)

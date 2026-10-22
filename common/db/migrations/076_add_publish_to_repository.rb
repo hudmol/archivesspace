@@ -1,4 +1,5 @@
 Sequel.migration do
+
   up do
     alter_table(:repository) do
       add_column(:publish, Integer)

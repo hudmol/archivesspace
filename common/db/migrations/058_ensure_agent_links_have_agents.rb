@@ -2,6 +2,7 @@
 # see https://archivesspace.atlassian.net/browse/AR-1320
 
 Sequel.migration do
+
   up do
 
     aspace_agent_id = self[:agent_software].filter( :system_role => 'archivesspace_agent' ).get(:id)

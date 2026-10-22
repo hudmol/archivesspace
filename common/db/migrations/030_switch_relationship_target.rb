@@ -8,6 +8,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
 
     record_type_to_id_map = {}

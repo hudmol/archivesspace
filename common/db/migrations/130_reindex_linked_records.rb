@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     $stderr.puts("Triggering a reindex of all archival records linked to subjects")
 

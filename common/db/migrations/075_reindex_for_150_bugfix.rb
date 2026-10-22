@@ -1,6 +1,7 @@
 require 'time'
 
 Sequel.migration do
+
   # The 1.5.0 release introduced a bug that caused the "fullrecord" field to be
   # incomplete, causing certain subrecords (such as notes, extents and rights
   # statements) to be unsearchable.

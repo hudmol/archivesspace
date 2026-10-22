@@ -2,6 +2,7 @@ require 'securerandom'
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     AGENT_TYPES = [:person, :family, :software, :corporate_entity]
 

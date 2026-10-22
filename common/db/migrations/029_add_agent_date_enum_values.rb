@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     $stderr.puts("Adding range date to the list of date_type enums")
     enum = self[:enumeration].filter(:name => 'date_type').select(:id)

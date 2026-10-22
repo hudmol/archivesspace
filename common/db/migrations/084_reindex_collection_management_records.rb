@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     self.transaction do
       # reindex all collection_management now their SOLR record `id` has changed

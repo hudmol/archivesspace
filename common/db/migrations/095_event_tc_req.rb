@@ -1,6 +1,7 @@
 require 'db/migrations/utils'
 
 Sequel.migration do
+
   up do
     # add reference identifier field to event
     alter_table(:event) do

@@ -1,6 +1,7 @@
 require_relative 'utils'
 
 Sequel.migration do
+
   up do
     enum = self[:enumeration].filter(:name => "job_type").select(:id)
 

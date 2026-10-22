@@ -2,6 +2,7 @@ require_relative 'utils'
 require 'digest/sha1'
 
 Sequel.migration do
+
   up do
     # Add our new column
     alter_table(:resource) do
