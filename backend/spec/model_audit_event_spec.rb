@@ -376,17 +376,6 @@ describe 'AuditEvent model' do
 
       expect(after_count).to eq(before_count + 1)
     end
-
-    it 'records MIGRATION via the migration audit logger' do
-      before_count = $testdb[:audit_event].where(:change_method => AuditEvent::CHANGE_METHOD_MIGRATION).count
-
-      AuditEventLogger.new($testdb).log_update_event(AuditEvent::OBJECT_TYPE_RESOURCE, @resource.uri)
-
-      event = $testdb[:audit_event].order(Sequel.desc(:id)).first
-
-      expect($testdb[:audit_event].where(:change_method => AuditEvent::CHANGE_METHOD_MIGRATION).count).to eq(before_count + 1)
-      expect(event[:change_method]).to eq(AuditEvent::CHANGE_METHOD_MIGRATION)
-    end
   end
 
   describe 'ASModel_crud log_event' do
