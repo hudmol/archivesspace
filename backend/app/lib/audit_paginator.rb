@@ -134,6 +134,9 @@ class AuditPaginator
 
     def transaction
       DB.open do |db|
+        @buffered_pages.clear
+        @id_set.clear
+
         AuditPaginator.lock_page_table!(db)
         @inside_transaction = true
 
