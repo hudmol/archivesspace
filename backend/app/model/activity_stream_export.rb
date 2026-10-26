@@ -78,12 +78,17 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
       raise "Invalid export type: #{type}"
     end
 
+    return if stream_stats.last_page.nil?
+
     page = 1
-    while page <= stream_stats.last_page do
+    while page <= stream_stats.last_page
       current_page = AuditEvent.page(page, nil, exclude_system_generated: true)
+      page += 1
 
       # Skip system pages
-      next if current_page.nil?
+      if current_page.nil?
+        next
+      end
 
       current_page.fetch(:orderedItems).each do |event|
         event = deep_keys_as_strings(event)
@@ -137,8 +142,6 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
           end
         end
       end
-
-      page += 1
     end
   end
 
