@@ -440,7 +440,7 @@ class AuditPaginator
     DB.open do |db|
       AuditPaginator.lock_page_table!(db)
 
-      min_unarchived_page = db[:audit_page].filter(page_event_type: 'audit').min(:page_number)
+      min_unarchived_page = db[:audit_page].filter(page_event_type: 'audit', is_page_complete: 1).min(:page_number)
 
       return if min_unarchived_page.nil?
 
@@ -454,6 +454,7 @@ class AuditPaginator
       end
 
       max_archives_remaining_this_round = 10
+      archived_any = false
 
       (min_unarchived_page..max_page_to_archive).each do |page_number_to_archive|
         did_something = false
@@ -484,6 +485,7 @@ class AuditPaginator
         end
 
         if did_something
+          archived_any = true
           max_archives_remaining_this_round -= 1
 
           if max_archives_remaining_this_round == 0
@@ -492,6 +494,9 @@ class AuditPaginator
           end
         end
       end
+
+      # Nothing to sweep if nothing changed
+      return unless archived_any
 
       # Sweep our audit tables for rows that are now fully archived (not
       # referenced by any 'audit' page)
