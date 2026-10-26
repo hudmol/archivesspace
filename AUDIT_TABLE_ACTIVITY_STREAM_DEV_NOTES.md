@@ -368,13 +368,14 @@ events should consume about 350MB of database storage.
 
 ## Audit logging and Database Migrations
 
-We investigated enforing the logging of audit events in database migrations.
+We investigated enforcing the logging of audit events in database migrations.
 We discovered that, while it is technically feasible, the burden on people
 writing migrations is unnecessarily onerous, and the potential for error is
 significant.
 
 As a result the decision is to not require audit logging in database migrations.
 Instead, there is a facility, in the staff UI, to generate a complete set of
-bulk audit events by object type, or for all object types. This allows users
-with the necessary permissions to trigger a resync from external systems thus
-picking up any changes from a database migration.
+bulk audit event pages (Note it may be desireable to restrict this to certain
+object types). This allows users with the necessary permissions to trigger a
+resync from external systems thus picking up any changes from a database
+migration.
