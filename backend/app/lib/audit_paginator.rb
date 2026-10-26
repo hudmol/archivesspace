@@ -16,6 +16,9 @@ class AuditPaginator
   # around again soon enough.
   MAX_PAGES_ARCHIVED_PER_ROUND = 10
 
+  # Likewise for moving pending bulk event pages into the audit_page table.
+  MAX_BULK_PAGES_PER_ROUND = 250
+
   def self.start
     @thread ||= Thread.new do
       AuditPaginator.new.run
@@ -143,13 +146,21 @@ class AuditPaginator
     return nil
   end
 
+  # Allows a caller to mark lots of record IDs as updated in one hit.  Avoids
+  # holding too much in memory, and writes pending pages of IDs to a holding
+  # table in the DB (like a write-ahead log).
+  #
+  # The idea is to have the AuditPaginator thread be solely responsible for
+  # writes to the `audit_page` table.  Request threads write to the WAL without
+  # blocking each other, and the AuditPaginator thread merges it all together
+  # without having to worry about concurrent writers.
   BulkIDConsumer = Struct.new(:timestamp, :record_type, :record_type_code, :activity_type, :change_method, :actor_type, :actor_name, :object_repo, :target_repo, :system_generated) do
     def initialize(*)
       super
 
       @id_set = RoaringBitmap.new
       @inside_transaction = false
-      @buffered_pages = {}
+      @buffered_pages = []
       @max_allowed_packet = nil
     end
 
@@ -158,7 +169,6 @@ class AuditPaginator
         @buffered_pages.clear
         @id_set.clear
 
-        AuditPaginator.lock_page_table!(db)
         @inside_transaction = true
 
         @max_allowed_packet = db.fetch("select @@max_allowed_packet as max_packet").first[:max_packet].to_i
@@ -189,91 +199,41 @@ class AuditPaginator
       if @id_set.cardinality == AuditPaginator::PAGE_SIZE || (@id_set.cardinality > 0 && force)
         @id_set.run_optimize
 
-        new_pages = {}
+        @buffered_pages << {
+          page_filter: record_type,
+          update_time: self.timestamp,
+          min_id_written: @id_set.first,
+          max_id_written: @id_set.last,
+          event_count: @id_set.cardinality,
+          id_set: AuditPaginator.id_set_to_bytes(@id_set),
+          bulk_record_type: self.record_type_code,
+          bulk_activity_type: self.activity_type,
+          bulk_change_method: self.change_method,
+          bulk_actor_type: self.actor_type,
+          bulk_actor_name: self.actor_name,
+          bulk_object_repo_id: self.object_repo,
+          bulk_target_repo_id: self.target_repo,
+          system_generated: self.system_generated,
+        }
 
-        [ANY_TYPE, record_type].each do |type_limit|
-          filters = { page_filter: type_limit }
-
-          # DB.open just to get the handle: we're already in an outer transaction
-          DB.open do |db|
-            # If there is a page in progress, we want to close it off.  Our
-            # events will be next in the activity stream.
-            db[:audit_page].filter(filters).filter(is_page_complete: 0).update(is_page_complete: 1)
-
-            # Time for a new page
-            last_page = db[:audit_page].filter(filters).for_update.max(:page_number) || 0
-
-            cumulative_prior_event_count = if last_page > 0
-                                             db[:audit_page]
-                                               .filter(filters)
-                                               .filter(page_number: last_page)
-                                               .for_update
-                                               .map {|p| p[:cumulative_prior_event_count] + p[:event_count] }
-                                               .first
-                                           else
-                                             0
-                                           end
-
-            # If we have buffered pages not yet written, adjust our numbers to include those too
-            last_page += @buffered_pages.fetch(filters, []).length
-            cumulative_prior_event_count += @buffered_pages.fetch(filters, []).map {|page| page[:event_count]}.sum
-
-            new_pages[type_limit] = last_page + 1
-
-            @buffered_pages[filters] ||= []
-            @buffered_pages[filters] << filters.merge(
-              page_event_type: 'bulk',
-              page_number: last_page + 1,
-              update_time: self.timestamp,
-              min_id_written: @id_set.first,
-              max_id_written: @id_set.last,
-              last_sequence_written: -1,
-              is_page_complete: 1,
-              event_count: @id_set.cardinality,
-              cumulative_prior_event_count: cumulative_prior_event_count,
-              id_set: AuditPaginator.id_set_to_bytes(@id_set),
-              bulk_record_type: self.record_type_code,
-              bulk_activity_type: self.activity_type,
-              bulk_change_method: self.change_method,
-              bulk_actor_type: self.actor_type,
-              bulk_actor_name: self.actor_name,
-              bulk_object_repo_id: self.object_repo,
-              bulk_target_repo_id: self.target_repo,
-
-              # Note: requirement that we process ANY_TYPE first because we
-              # depend on its page for subsequent inserts.
-              bulk_all_stream_page_number: new_pages.fetch(ANY_TYPE),
-
-              system_generated: self.system_generated,
-            )
-          end
-        end
         @id_set.clear
       end
 
       # And write to the DB if we're ready to write
-      [ANY_TYPE, record_type].each do |type_limit|
-        filters = { page_filter: type_limit }
+      return if @buffered_pages.empty?
 
-        pages_to_write = @buffered_pages.fetch(filters, [])
-        next if pages_to_write.empty?
+      estimated_packet_size = @buffered_pages.map {|page| page.values.map {|field| field.to_s.bytesize }.sum }.sum
+      nearing_max_packet = (estimated_packet_size.to_f / @max_allowed_packet.to_f) >= 0.8
 
-        estimated_packet_size = pages_to_write.map {|page| page.values.map {|field| field.to_s.bytesize }.sum }.sum
-        nearing_max_packet = (estimated_packet_size.to_f / @max_allowed_packet.to_f) >= 0.8
-
-        if (force && pages_to_write.length > 0) ||
-           pages_to_write.length >= ROW_BUFFER_COUNT ||
-           nearing_max_packet
-          DB.open do |db|
-            db[:audit_page].multi_insert(@buffered_pages.fetch(filters))
-          end
-
-          @buffered_pages.fetch(filters).each do |page|
-            Log.info("Audit page #{page.fetch(:page_number)} of #{page.fetch(:event_count)} bulk events inserted for type #{record_type}")
-          end
-
-          @buffered_pages.fetch(filters).clear
+      if force || @buffered_pages.length >= ROW_BUFFER_COUNT || nearing_max_packet
+        # DB.open just to get the handle: we're already in an outer transaction
+        DB.open do |db|
+          db[:audit_bulk_page_pending].multi_insert(@buffered_pages)
         end
+
+        Log.info("#{@buffered_pages.length} pending audit page(s) of bulk events written for type #{record_type}")
+
+        @buffered_pages.clear
       end
     end
   end
@@ -442,6 +402,8 @@ class AuditPaginator
       assign_sequence_numbers(db)
       max_sequence = db[:audit_event].max(:sequence)
     end
+
+    drain_pending_bulk_pages
 
     audit_record_types = DB.open do |db|
       db[:audit_record].select(:type).distinct.map(:type)
@@ -655,27 +617,18 @@ class AuditPaginator
           Log.info("Audit page #{page_in_progress.fetch(:page_number)} updated")
         else
           # Time for a new page.
-          last_page = db[:audit_page].filter(page_filter: record_type).max(:page_number) || 0
-
-          cumulative_prior_event_count = if last_page > 0
-                                           db[:audit_page]
-                                             .filter(page_filter: record_type, page_number: last_page)
-                                             .map {|p| p[:cumulative_prior_event_count] + p[:event_count] }
-                                             .first
-                                         else
-                                           0
-                                         end
+          next_position = next_page_position(db, record_type)
 
           db[:audit_page]
             .insert(
               filters.merge(
-                page_number: last_page + 1,
+                page_number: next_position.next_page_number,
                 update_time: Time.now,
                 min_id_written: id_set.first,
                 max_id_written: id_set.last,
                 last_sequence_written: last_sequence_written,
                 is_page_complete: id_set.cardinality < PAGE_SIZE ? 0 : 1,
-                cumulative_prior_event_count: cumulative_prior_event_count,
+                cumulative_prior_event_count: next_position.cumulative_prior_event_count,
                 event_count: id_set.cardinality,
                 id_set: AuditPaginator.id_set_to_bytes(id_set),
 
@@ -691,9 +644,81 @@ class AuditPaginator
               )
             )
 
-          Log.info("Audit page #{last_page + 1} inserted for type #{record_type}")
+          Log.info("Audit page #{next_position.next_page_number} inserted for type #{record_type}")
         end
       end
+    end
+  end
+
+  NextPagePosition = Struct.new(:next_page_number, :cumulative_prior_event_count)
+
+  # The page number and cumulative_prior_event_count for the next page
+  # appended to the stream for `page_filter`.
+  def next_page_position(db, page_filter)
+    last_page = db[:audit_page].filter(page_filter: page_filter).max(:page_number) || 0
+
+    cumulative_prior_event_count = if last_page > 0
+                                     db[:audit_page]
+                                       .filter(page_filter: page_filter, page_number: last_page)
+                                       .map {|p| p[:cumulative_prior_event_count] + p[:event_count] }
+                                       .first
+                                   else
+                                     0
+                                   end
+
+    NextPagePosition.new(last_page + 1, cumulative_prior_event_count)
+  end
+
+  # Move pages of bulk events written by request threads (see BulkIDConsumer)
+  # into the activity stream.  Each pending page becomes a page in the ANY_TYPE
+  # stream and also one in its own record type's stream.
+  def drain_pending_bulk_pages
+    DB.open do |db|
+      AuditPaginator.lock_page_table!(db)
+
+      pending = db[:audit_bulk_page_pending].order(:id).limit(MAX_BULK_PAGES_PER_ROUND).all
+
+      return if pending.empty?
+
+      next_position_by_filter = {}
+      new_pages = []
+
+      pending.each do |pending_page|
+        all_stream_page_number = nil
+
+        # ANY_TYPE first, since the per-type page links to its page number
+        [ANY_TYPE, pending_page.fetch(:page_filter)].each do |page_filter|
+          unless next_position_by_filter.has_key?(page_filter)
+            # If there is a page in progress, we want to close it off.  Our
+            # events will be next in the activity stream.
+            db[:audit_page].filter(page_filter: page_filter, is_page_complete: 0).update(is_page_complete: 1)
+
+            next_position_by_filter[page_filter] = next_page_position(db, page_filter)
+          end
+
+          next_position = next_position_by_filter.fetch(page_filter)
+          all_stream_page_number ||= next_position.next_page_number
+
+          new_pages << pending_page.reject {|k, _| k == :id}.merge(
+            page_filter: page_filter,
+            page_event_type: 'bulk',
+            page_number: next_position.next_page_number,
+            last_sequence_written: -1,
+            is_page_complete: 1,
+            cumulative_prior_event_count: next_position.cumulative_prior_event_count,
+            id_set: Sequel.blob(pending_page.fetch(:id_set)),
+            bulk_all_stream_page_number: all_stream_page_number,
+          )
+
+          next_position.next_page_number += 1
+          next_position.cumulative_prior_event_count += pending_page.fetch(:event_count)
+        end
+      end
+
+      db[:audit_page].multi_insert(new_pages, :slice => ROW_BUFFER_COUNT)
+      db[:audit_bulk_page_pending].filter(id: pending.map {|row| row.fetch(:id)}).delete
+
+      Log.info("#{pending.length} pending bulk audit page(s) added to the activity stream")
     end
   end
 

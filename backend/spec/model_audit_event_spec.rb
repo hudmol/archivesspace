@@ -41,11 +41,14 @@ describe 'AuditEvent model' do
     allow(AppConfig).to receive(:[]).and_call_original
     allow(AppConfig).to receive(:[]).with(:enable_audit_logging).and_return(true)
 
+    allow(AppConfig).to receive(:[]).with(:audit_logging_archive_threshold).and_return(nil)
+
     allow(AppConfig).to receive(:[]).with(:audit_logging_include_object_types).and_return(['accession', 'assessment'])
   end
 
   def reset_audit_tables
     # Start fresh to make it easier to test (rolls back after each test)
+    $testdb[:audit_bulk_page_pending].delete
     $testdb[:audit_page].delete
     $testdb[:audit_record].delete
     $testdb[:audit_event].delete
@@ -163,8 +166,10 @@ describe 'AuditEvent model' do
       reset_audit_tables
 
       top_containers = (AuditPaginator::PAGE_SIZE + 1).times.map { create(:json_top_container) }
+
       create_bulk_top_container_page(:timestamp => Time.utc(2024, 1, 1, 12, 0, 0),
                                      :top_container_ids => top_containers.map(&:id))
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
 
       page_1 = AuditEvent.page(1, 'top_container')
       page_2 = AuditEvent.page(2, 'top_container')
@@ -195,6 +200,7 @@ describe 'AuditEvent model' do
 
       create_bulk_top_container_page(:timestamp => first_timestamp, :top_container_ids => [top_container_1.id])
       create_bulk_top_container_page(:timestamp => second_timestamp, :top_container_ids => [top_container_2.id])
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
 
       first_page = AuditEvent.page(1, 'top_container')
       second_page = AuditEvent.page(2, 'top_container')
@@ -226,6 +232,8 @@ describe 'AuditEvent model' do
       create_bulk_top_container_page(:timestamp => Time.utc(2024, 1, 1, 10, 30, 0),
                                      :top_container_ids => [top_container.id])
 
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
       create_audit_event(:timestamp => Time.utc(2024, 1, 1, 11, 0, 0),
                          :activity_type => AuditEvent::ACTIVITY_TYPE_UPDATE,
                          :records => [{:role => AuditEvent::ROLE_OBJECT,
@@ -251,6 +259,108 @@ describe 'AuditEvent model' do
       expect(first_page[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(@resource.uri))
       expect(second_page[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(top_container.uri))
       expect(third_page[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(@accession.uri))
+    end
+  end
+
+  describe 'pending bulk pages' do
+    it 'writes one pending page per page of IDs and leaves the stream alone until the paginator runs' do
+      reset_audit_tables
+
+      top_containers = (AuditPaginator::PAGE_SIZE + 1).times.map { create(:json_top_container) }
+      create_bulk_top_container_page(:timestamp => Time.utc(2024, 1, 1, 12, 0, 0),
+                                     :top_container_ids => top_containers.map(&:id))
+
+      expect($testdb[:audit_bulk_page_pending].order(:id).select_map(:event_count)).to eq([AuditPaginator::PAGE_SIZE, 1])
+      expect($testdb[:audit_page].count).to eq(0)
+
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      expect($testdb[:audit_bulk_page_pending].count).to eq(0)
+
+      ['_all', 'top_container'].each do |page_filter|
+        pages = $testdb[:audit_page].filter(page_filter: page_filter).order(:page_number).all
+
+        expect(pages.map {|p| p[:page_number]}).to eq([1, 2])
+        expect(pages.map {|p| p[:page_event_type]}.uniq).to eq(['bulk'])
+        expect(pages.map {|p| p[:event_count]}).to eq([AuditPaginator::PAGE_SIZE, 1])
+        expect(pages.map {|p| p[:cumulative_prior_event_count]}).to eq([0, AuditPaginator::PAGE_SIZE])
+        expect(pages.map {|p| p[:bulk_all_stream_page_number]}).to eq([1, 2])
+        expect(pages.map {|p| p[:is_page_complete]}.uniq).to eq([1])
+      end
+    end
+
+    it 'discards pending pages when the enclosing transaction rolls back' do
+      top_container = create(:json_top_container)
+      reset_audit_tables
+
+      $testdb.transaction(:savepoint => true) do
+        create_bulk_top_container_page(:timestamp => Time.utc(2024, 1, 1, 12, 0, 0),
+                                       :top_container_ids => [top_container.id])
+
+        expect($testdb[:audit_bulk_page_pending].count).to eq(1)
+
+        raise Sequel::Rollback
+      end
+
+      expect($testdb[:audit_bulk_page_pending].count).to eq(0)
+
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      expect($testdb[:audit_page].count).to eq(0)
+    end
+
+    it 'drains a large backlog of pending pages over multiple rounds' do
+      stub_const('AuditPaginator::MAX_BULK_PAGES_PER_ROUND', 2)
+
+      top_containers = 3.times.map { create(:json_top_container) }
+      reset_audit_tables
+
+      top_containers.each_with_index do |top_container, idx|
+        create_bulk_top_container_page(:timestamp => Time.utc(2024, 1, 1, 12, idx, 0),
+                                       :top_container_ids => [top_container.id])
+      end
+
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      expect($testdb[:audit_bulk_page_pending].count).to eq(1)
+      expect($testdb[:audit_page].filter(page_filter: '_all').count).to eq(2)
+
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      expect($testdb[:audit_bulk_page_pending].count).to eq(0)
+
+      all_pages = $testdb[:audit_page].filter(page_filter: '_all').order(:page_number).all
+      expect(all_pages.map {|p| p[:page_number]}).to eq([1, 2, 3])
+      expect(all_pages.map {|p| p[:cumulative_prior_event_count]}).to eq([0, 1, 2])
+
+      response = AuditEvent.page(3, 'top_container')
+      expect(response[:orderedItems][0][:id]).to eq(AuditEvent.activity_stream_uri('/event/_blk_p3o0'))
+      expect(response[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(top_containers.last.uri))
+    end
+
+    it 'closes off a page of regular events in progress before adding bulk pages' do
+      top_container = create(:json_top_container)
+      reset_audit_tables
+
+      create_audit_event(:timestamp => Time.utc(2024, 1, 1, 10, 0, 0),
+                         :activity_type => AuditEvent::ACTIVITY_TYPE_CREATE,
+                         :records => [{:role => AuditEvent::ROLE_OBJECT,
+                                       :type => 'top_container',
+                                       :uri => top_container.uri}])
+
+      AuditPaginator.new.send(:paginate_audit_records)
+
+      expect($testdb[:audit_page].filter(page_filter: 'top_container', page_number: 1).get(:is_page_complete)).to eq(0)
+
+      create_bulk_top_container_page(:timestamp => Time.utc(2024, 1, 1, 10, 30, 0),
+                                     :top_container_ids => [top_container.id])
+
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      pages = $testdb[:audit_page].filter(page_filter: 'top_container').order(:page_number).all
+      expect(pages.map {|p| p[:page_event_type]}).to eq(['audit', 'bulk'])
+      expect(pages.map {|p| p[:is_page_complete]}).to eq([1, 1])
+      expect(pages.map {|p| p[:cumulative_prior_event_count]}).to eq([0, 1])
     end
   end
 
