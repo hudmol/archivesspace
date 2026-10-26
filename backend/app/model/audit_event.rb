@@ -179,8 +179,8 @@ class AuditEvent
           '@context' => W3C_URL,
           :type => 'OrderedCollection',
           :totalItems => page_info.total,
-          :first => uri + "/page/1",
-          :last => uri + "/page/#{page_info.last_page}",
+          :first => { :id => uri + "/page/1", :type => 'OrderedCollectionPage'},
+          :last => { :id => uri + "/page/#{page_info.last_page}", :type => 'OrderedCollectionPage'},
         }
       end
     end
