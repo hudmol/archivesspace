@@ -375,6 +375,7 @@ class AuditPaginator
       rescue
         Log.error("Failure generating transfer move events for type #{jsonmodel_cls.record_type}: #{$!}")
         Log.exception($!)
+        raise $!
       end
     end
   end
@@ -408,6 +409,7 @@ class AuditPaginator
       rescue
         Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
         Log.exception($!)
+        raise $!
       end
     end
   end
