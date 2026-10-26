@@ -66,7 +66,7 @@ describe 'AuditEvent controller' do
     expect(post_response['type']).to eq('OrderedCollection')
     expect(post_response['totalItems']).to eq(pre_response['totalItems'] + 1)
     expect(post_response['first']).to eq(pre_response['first'])
-    expect(post_response['last']).to eq(AuditEvent.activity_stream_uri("/resource/page/#{new_page + 1}"))
+    expect(post_response['last']['id']).to eq(AuditEvent.activity_stream_uri("/resource/page/#{new_page + 1}"))
   end
 
   describe 'change method entry paths' do
