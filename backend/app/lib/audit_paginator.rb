@@ -177,12 +177,13 @@ class AuditPaginator
             db[:audit_page].filter(filters).filter(is_page_complete: 0).update(is_page_complete: 1)
 
             # Time for a new page
-            last_page = db[:audit_page].filter(filters).max(:page_number) || 0
+            last_page = db[:audit_page].filter(filters).for_update.max(:page_number) || 0
 
             cumulative_prior_event_count = if last_page > 0
                                              db[:audit_page]
                                                .filter(filters)
                                                .filter(page_number: last_page)
+                                               .for_update
                                                .map {|p| p[:cumulative_prior_event_count] + p[:event_count] }
                                                .first
                                            else
@@ -533,11 +534,8 @@ class AuditPaginator
   end
 
   def assign_sequence_numbers(db)
-    last_sequence_number = db[:audit_event].max(:sequence)
-
-    if last_sequence_number.nil?
-      last_sequence_number = 0
-    end
+    last_sequence_number = [db[:audit_event].max(:sequence),
+                            db[:audit_page].max(:last_sequence_written)].compact.max || 0
 
     loop do
       ids_to_update = db[:audit_event]
