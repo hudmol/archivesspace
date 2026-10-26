@@ -113,19 +113,28 @@ class AuditEvent
     if event_id.start_with?("_blk")
       # Batch event
       if event_id =~ /\A_blk_p([0-9]+)o([0-9]+)\z/
-        page_number = Integer($1)
-        offset = Integer($2)
+        page_number = Integer($1, 10)
+        offset = Integer($2, 10)
 
         rendered_page = self.page(page_number)
+        return nil unless rendered_page
 
-        rendered_page.fetch(:orderedItems).fetch(offset).merge('@context' => W3C_URL)
+        event = rendered_page.fetch(:orderedItems).fetch(offset, nil)
+
+        # Make sure we actually landed on the bulk event we were asked for (and
+        # not an out of range offset, or a regular event on a non-bulk page)
+        return nil unless event && event[:id] == activity_stream_uri("/event/#{event_id}")
+
+        event.merge('@context' => W3C_URL)
       else
         return nil
       end
     else
       # Regular single event (by id)
+      return nil unless event_id =~ /\A[0-9]+\z/
+
       DB.open do |db|
-        event_id = Integer(event_id)
+        event_id = Integer(event_id, 10)
         if (event = find_events(db, {:event_ids => event_id}).first)
           return render(event)
         elsif (archived_event = AuditPaginator.find_archived_event(db, event_id))
