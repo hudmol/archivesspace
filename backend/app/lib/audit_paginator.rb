@@ -12,6 +12,10 @@ class AuditPaginator
 
   PAGE_SIZE = 500
 
+  # Avoid doing long runs of archiving and hurting responsiveness.  We'll go
+  # around again soon enough.
+  MAX_PAGES_ARCHIVED_PER_ROUND = 10
+
   def self.start
     @thread ||= Thread.new do
       AuditPaginator.new.run
@@ -444,63 +448,59 @@ class AuditPaginator
     DB.open do |db|
       AuditPaginator.lock_page_table!(db)
 
-      min_unarchived_page = db[:audit_page].filter(page_event_type: 'audit', is_page_complete: 1).min(:page_number)
+      # Each stream keeps its own `max_unarchived_pages` most recent pages
+      # unarchived, so the cutoff is calculated per page_filter.
+      max_page_by_filter = db[:audit_page]
+                             .group(:page_filter)
+                             .order(:page_filter)
+                             .select_hash(:page_filter, Sequel.function(:max, :page_number).as(:max_page))
 
-      return if min_unarchived_page.nil?
+      archivable_pages = []
 
-      max_page_to_archive = if (max_page = db[:audit_page].max(:page_number))
-                              (max_page - max_unarchived_pages)
-                            end
+      max_page_by_filter.each do |page_filter, max_page|
+        max_archivable_page = max_page - max_unarchived_pages
 
-      if max_page_to_archive < min_unarchived_page
-        # Nothing to do
-        return
-      end
-
-      max_archives_remaining_this_round = 10
-      archived_any = false
-
-      (min_unarchived_page..max_page_to_archive).each do |page_number_to_archive|
-        did_something = false
-
-        db[:audit_page].filter(page_number: page_number_to_archive, page_event_type: 'audit', is_page_complete: 1).each do |row|
-          ids = AuditPage.new(row, false).event_ids
-
-          filter = row.fetch(:page_filter)
-
-          if filter == ANY_TYPE
-            filter = nil
-          end
-
-          events = JSON.dump(AuditEvent.find_events(db, {:object_type => filter, :event_ids => ids}))
-
-          compressed = AuditPaginator.compress(events)
-
-          db[:audit_page]
-            .filter(id: row.fetch(:id))
-            .update(
-              archive: Sequel.blob(compressed),
-              page_event_type: 'archived',
-              min_id_written: ids.min,
-              max_id_written: ids.max,
-            )
-
-          did_something = true
-        end
-
-        if did_something
-          archived_any = true
-          max_archives_remaining_this_round -= 1
-
-          if max_archives_remaining_this_round == 0
-            # Avoid doing long runs of archiving and hurting responsiveness.  We'll go around again soon enough.
+        db[:audit_page]
+          .filter(page_filter: page_filter, page_event_type: 'audit', is_page_complete: 1)
+          .where { page_number <= max_archivable_page }
+          .order(:page_number)
+          .limit(MAX_PAGES_ARCHIVED_PER_ROUND)
+          .select(:id, :page_number)
+          .each do |row|
+          if archivable_pages.length < MAX_PAGES_ARCHIVED_PER_ROUND
+            archivable_pages << row.fetch(:id)
+          else
             break
           end
         end
       end
 
-      # Nothing to sweep if nothing changed
-      return unless archived_any
+      # Nothing to archive, and therefore nothing to do
+      return if archivable_pages.empty?
+
+      archivable_pages.each do |page_id|
+        row = db[:audit_page].filter(id: page_id).first
+        ids = AuditPage.new(row, false).event_ids
+
+        filter = row.fetch(:page_filter)
+
+        if filter == ANY_TYPE
+          filter = nil
+        end
+
+        events = JSON.dump(AuditEvent.find_events(db, {:object_type => filter, :event_ids => ids}))
+
+        compressed = AuditPaginator.compress(events)
+
+        db[:audit_page]
+          .filter(id: row.fetch(:id))
+          .update(
+            archive: Sequel.blob(compressed),
+            page_event_type: 'archived',
+            min_id_written: ids.min,
+            max_id_written: ids.max,
+          )
+      end
 
       # Sweep our audit tables for rows that are now fully archived (not
       # referenced by any 'audit' page)
