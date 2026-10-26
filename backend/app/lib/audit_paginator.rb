@@ -1,3 +1,4 @@
+require 'securerandom'
 require_relative 'jars/RoaringBitmap-1.6.20.jar'
 
 java_import 'org.roaringbitmap.RoaringBitmap'
@@ -19,6 +20,11 @@ class AuditPaginator
   # Likewise for moving pending bulk event pages into the audit_page table.
   MAX_BULK_PAGES_PER_ROUND = 250
 
+  MY_THREAD_ID = SecureRandom.hex
+
+  # A safe margin for how long we might go without touching the lock
+  LOCK_EXPIRE_SECONDS = 900
+
   def self.start
     @thread ||= Thread.new do
       AuditPaginator.new.run
@@ -28,12 +34,64 @@ class AuditPaginator
   def run
     loop do
       begin
-        paginate_audit_records
+        AuditPaginator.try_with_page_lock do
+          paginate_audit_records
+        end
       rescue Exception => e
         Log.error("Unexpected error in AuditPaginator thread: #{e}")
         Log.exception(e)
       ensure
         sleep 5
+      end
+    end
+  end
+
+  def self.try_with_page_lock
+    got_lock = false
+
+    DB.open do |db|
+      now = Time.now
+
+      if db[:audit_page_lock]
+           .filter(Sequel.~(lock_holder: MY_THREAD_ID))
+           .where { lock_expire_time >= now }
+           .count > 0
+        # Early out: someone holds the lock
+        Log.debug("AuditPaginator failed to get page lock.  Will skip this run.")
+        return
+      end
+
+      row = db[:audit_page_lock].for_update.first or
+        raise "Could not find a lock in table audit_page_lock.  Did the row get deleted by mistake?"
+
+      if row.fetch(:lock_holder) == MY_THREAD_ID || (row.fetch(:lock_expire_time) && now >= row.fetch(:lock_expire_time))
+        # Clear existing/expired lock
+        Log.info("Paginator #{MY_THREAD_ID}: Clearing existing/expired lock: #{row}")
+        db[:audit_page_lock].filter(id: row.fetch(:id)).update(lock_holder: nil, lock_expire_time: nil)
+      end
+
+      got_lock = (db[:audit_page_lock].filter(lock_holder: nil).update(lock_holder: MY_THREAD_ID, lock_expire_time: now + LOCK_EXPIRE_SECONDS) > 0)
+    end
+
+    if got_lock
+      begin
+        yield
+      ensure
+        # Release the lock
+        DB.open do |db|
+          db[:audit_page_lock].filter(lock_holder: MY_THREAD_ID).update(lock_holder: nil, lock_expire_time: nil)
+        end
+      end
+    else
+      Log.debug("AuditPaginator failed to get page lock.  Will skip this run.")
+    end
+  end
+
+  def self.refresh_page_lock!
+    DB.open do |db|
+      now = Time.now
+      if db[:audit_page_lock].filter(lock_holder: MY_THREAD_ID).update(lock_expire_time: now + LOCK_EXPIRE_SECONDS) == 0
+        raise "AuditPaginator lock refresh failed.  Did we time out while holding the lock?"
       end
     end
   end
@@ -398,7 +456,7 @@ class AuditPaginator
     max_sequence = nil
 
     DB.open do |db|
-      AuditPaginator.lock_page_table!(db)
+      AuditPaginator.refresh_page_lock!
       assign_sequence_numbers(db)
       max_sequence = db[:audit_event].max(:sequence)
     end
@@ -427,7 +485,7 @@ class AuditPaginator
     return if max_sequence.nil?
 
     DB.open do |db|
-      AuditPaginator.lock_page_table!(db)
+      AuditPaginator.refresh_page_lock!
 
       # Each stream keeps its own `max_unarchived_pages` most recent pages
       # unarchived, so the cutoff is calculated per page_filter.
@@ -460,6 +518,8 @@ class AuditPaginator
       return if archivable_pages.empty?
 
       archivable_pages.each do |page_id|
+        AuditPaginator.refresh_page_lock!
+
         row = db[:audit_page].filter(id: page_id).first
         ids = AuditPage.new(row, false).event_ids
 
@@ -542,7 +602,7 @@ class AuditPaginator
 
     loop do
       DB.open do |db|
-        AuditPaginator.lock_page_table!(db)
+        AuditPaginator.refresh_page_lock!
 
         # We may or may not have room in the last page for more records.  Maybe
         # there's no room, or maybe there's no page yet at all.
@@ -674,7 +734,7 @@ class AuditPaginator
   # stream and also one in its own record type's stream.
   def drain_pending_bulk_pages
     DB.open do |db|
-      AuditPaginator.lock_page_table!(db)
+      AuditPaginator.refresh_page_lock!
 
       pending = db[:audit_bulk_page_pending].order(:id).limit(MAX_BULK_PAGES_PER_ROUND).all
 
@@ -684,6 +744,8 @@ class AuditPaginator
       new_pages = []
 
       pending.each do |pending_page|
+        AuditPaginator.refresh_page_lock!
+
         all_stream_page_number = nil
 
         # ANY_TYPE first, since the per-type page links to its page number
@@ -734,11 +796,6 @@ class AuditPaginator
 
   def debug_id_set(id_set)
     "#id_set[" + id_set.to_a.join(",") + "]"
-  end
-
-  def self.lock_page_table!(db)
-    db[:audit_page_lock].for_update.first or
-      raise "Could not find a lock in table audit_page_lock.  Did the row get deleted by mistake?"
   end
 
   def self.compress(string)
