@@ -874,4 +874,16 @@ AppConfig[:activity_stream_use_relative_uris] = false
 #   accession, location, assessment, permission, group, user
 AppConfig[:audit_logging_include_object_types] = []
 
+# For each activity stream, controls how many of the most recent pages will be
+# excluded from archiving.
+#
+# For example, a value of 10 will archive all but the 10-most-recent pages for
+# each activity stream.
+#
+# You can use this value to control the growth of rows in the `audit_event` and
+# `audit_record` tables.  As pages are archived, their rows are removed from
+# these tables.
+#
+# A value of `nil` (the default) disables archiving.
 AppConfig[:audit_logging_archive_threshold] = nil
+
