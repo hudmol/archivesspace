@@ -77,6 +77,23 @@ class AuditPaginator
       self.page.fetch(:page_event_type)
     end
 
+    def etag
+      @etag ||= if self.page.fetch(:is_page_complete) == 1 && self.has_next_page
+                  Digest::SHA256.hexdigest([self.page.fetch(:page_number), self.page.fetch(:page_filter), self.page.fetch(:update_time)].map(&:to_s).join("\1"))
+                else
+                  "_" + SecureRandom.hex
+                end
+    end
+
+    # Only stable pages get a Last-Modified.  update_time doesn't change when
+    # a page completes or gains a next page, so If-Modified-Since would
+    # otherwise 304 a client into a stale copy.
+    def last_modified
+      return nil unless self.page.fetch(:is_page_complete) == 1 && self.has_next_page
+
+      self.page.fetch(:update_time, nil)
+    end
+
     private
 
     def fix_integer_keys!(elt)

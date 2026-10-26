@@ -1,3 +1,5 @@
+require 'rack/deflater'
+
 class ArchivesSpaceService < Sinatra::Base
 
   if AppConfig[:enable_audit_logging]
@@ -27,13 +29,7 @@ class ArchivesSpaceService < Sinatra::Base
       .returns([200, "an OrderedCollectionPage"],
                [404, "page not available"]) \
     do
-      result = AuditEvent.page(params[:page])
-
-      if result
-        activity_json_response(result)
-      else
-        raise NotFoundException.new("page not available")
-      end
+      handle_page_response(params)
     end
 
     Endpoint.get('/activity-stream/event/:id')
@@ -74,13 +70,7 @@ class ArchivesSpaceService < Sinatra::Base
       .returns([200, "an OrderedCollectionPage"],
                [404, "page not available"]) \
     do
-      result = AuditEvent.page(params[:page], params[:object_type])
-
-      if result
-        activity_json_response(result)
-      else
-        raise NotFoundException.new("page not available")
-      end
+      handle_page_response(params)
     end
 
     def activity_json_response(obj, status = 200)
@@ -175,5 +165,33 @@ class ArchivesSpaceService < Sinatra::Base
       AuditPaginator.mark_everything_updated!
       json_response({'status' => 'success'})
     end
+  end
+
+  def handle_page_response(params)
+    audit_page = DB.open do |db|
+      AuditPaginator.get_page(db, params[:page], params.fetch(:object_type, nil))
+    end
+
+    if audit_page
+      # Sinatra's helpers handle quoting, If-None-Match lists and
+      # If-Modified-Since, and halt with a bodiless 304 when the client is fresh.
+      # The ETag is weak because the same page may be served gzipped or not.
+      # Vary is set here (not just by Rack::Deflater) so it's on 304s too.
+      headers['Vary'] = 'Accept-Encoding'
+      etag(audit_page.etag, :weak)
+      last_modified(audit_page.last_modified)
+    end
+
+    result = AuditEvent.page(params[:page], params.fetch(:object_type, nil))
+
+    if result
+      maybe_compressed_response(env, activity_json_response(result))
+    else
+      raise NotFoundException.new("page not available")
+    end
+  end
+
+  def maybe_compressed_response(env, response)
+    Rack::Deflater.new(proc { response }).call(env)
   end
 end
