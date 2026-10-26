@@ -108,8 +108,8 @@ class AuditPaginator
   def self.find_archived_event(db, event_id)
     db[:audit_page]
       .filter(page_event_type: 'archived', page_filter: ANY_TYPE)
-      .where { first_id_written <= event_id }
-      .where { last_id_written >= event_id }
+      .where { min_id_written <= event_id }
+      .where { max_id_written >= event_id }
       .each do |matched_page|
 
       AuditPage.new(matched_page, nil).extract_archive.each do |event_record|
@@ -200,7 +200,9 @@ class AuditPaginator
               page_event_type: 'bulk',
               page_number: last_page + 1,
               update_time: self.timestamp,
-              last_id_written: -1,
+              min_id_written: @id_set.first,
+              max_id_written: @id_set.last,
+              last_sequence_written: -1,
               is_page_complete: 1,
               event_count: @id_set.cardinality,
               cumulative_prior_event_count: cumulative_prior_event_count,
@@ -406,6 +408,14 @@ class AuditPaginator
   private
 
   def paginate_audit_records
+    max_sequence = nil
+
+    DB.open do |db|
+      AuditPaginator.lock_page_table!(db)
+      assign_sequence_numbers(db)
+      max_sequence = db[:audit_event].max(:sequence)
+    end
+
     audit_record_types = DB.open do |db|
       db[:audit_record].select(:type).distinct.map(:type)
     end
@@ -418,13 +428,14 @@ class AuditPaginator
     # "any type"
     paginate_audit_records_for_type
 
-    archive_pages
+    archive_pages(max_sequence)
   end
 
-  def archive_pages
+  def archive_pages(max_sequence)
     max_unarchived_pages = AppConfig[:audit_logging_archive_threshold]
 
     return if max_unarchived_pages.nil?
+    return if max_sequence.nil?
 
     DB.open do |db|
       AuditPaginator.lock_page_table!(db)
@@ -465,8 +476,8 @@ class AuditPaginator
             .update(
               archive: Sequel.blob(compressed),
               page_event_type: 'archived',
-              first_id_written: ids.min,
-              last_id_written: ids.max,
+              min_id_written: ids.min,
+              max_id_written: ids.max,
             )
 
           did_something = true
@@ -497,6 +508,12 @@ class AuditPaginator
       remove_ids = []
 
       db[:audit_event].each do |audit_event|
+        # Events without a sequence number haven't been paginated yet
+        next if audit_event.fetch(:sequence).nil?
+
+        # Events greater than max_sequence were added since we started running
+        next if audit_event.fetch(:sequence) > max_sequence
+
         next if live_ids.contains(audit_event.fetch(:id))
         remove_ids << audit_event.fetch(:id)
       end
@@ -506,6 +523,29 @@ class AuditPaginator
         db[:audit_event].filter(id: remove_ids).delete
 
         Log.info("Archived #{remove_ids.length} event records")
+      end
+    end
+  end
+
+  def assign_sequence_numbers(db)
+    last_sequence_number = db[:audit_event].max(:sequence)
+
+    if last_sequence_number.nil?
+      last_sequence_number = 0
+    end
+
+    loop do
+      ids_to_update = db[:audit_event]
+                        .filter(:sequence => nil)
+                        .limit(1000)
+                        .select(:id)
+                        .map(:id)
+
+      break if ids_to_update.empty?
+
+      ids_to_update.each do |event_id|
+        last_sequence_number += 1
+        db[:audit_event].filter(:id => event_id).update(:sequence => last_sequence_number)
       end
     end
   end
@@ -521,18 +561,26 @@ class AuditPaginator
         # there's no room, or maybe there's no page yet at all.
         page_in_progress = db[:audit_page].filter(filters).filter(is_page_complete: 0).first
 
-        last_id_written = 0
+        last_sequence_written = 0
         id_set = RoaringBitmap.new
 
         if page_in_progress
           # Load the partial page and the last event record we saw
-          last_id_written = page_in_progress.fetch(:last_id_written)
+          last_sequence_written = page_in_progress.fetch(:last_sequence_written)
           id_set.deserialize(ByteBuffer.wrap(page_in_progress.fetch(:id_set)
                                                .force_encoding(Encoding::ASCII_8BIT)
                                                .to_java_bytes))
         else
-          if (last_page = db[:audit_page].filter(filters).order(Sequel.desc(:page_number)).first)
-            last_id_written = last_page.fetch(:last_id_written)
+          # Archived pages count too: if every page in this stream has been
+          # archived, we still need to resume from where the last one left off.
+          #
+          # Bulk pages are skipped because they don't have a meaningful
+          # last_sequence_written value.
+          if (last_page = db[:audit_page]
+                            .filter(page_filter: record_type, page_event_type: ['audit', 'archived'])
+                            .order(Sequel.desc(:page_number))
+                            .first)
+            last_sequence_written = last_page.fetch(:last_sequence_written)
           end
         end
 
@@ -555,9 +603,9 @@ class AuditPaginator
                             )
                           end
 
-          new_events = audit_dataset.where { id > last_id_written }.limit(remaining_entry_count).select(:id)
+          new_events = audit_dataset.where { sequence > last_sequence_written }.order(:sequence).limit(remaining_entry_count).select(:sequence, :id)
           new_events.each do |row|
-            last_id_written = row.fetch(:id)
+            last_sequence_written = row.fetch(:sequence)
             id_set.add(row.fetch(:id))
             page_updated = true
           end
@@ -571,7 +619,9 @@ class AuditPaginator
           # Update the existing page
           db[:audit_page]
             .filter(id: page_in_progress.fetch(:id))
-            .update(last_id_written: last_id_written,
+            .update(min_id_written: id_set.first,
+                    max_id_written: id_set.last,
+                    last_sequence_written: last_sequence_written,
                     update_time: Time.now,
                     id_set: AuditPaginator.id_set_to_bytes(id_set),
                     event_count: id_set.cardinality,
@@ -596,7 +646,9 @@ class AuditPaginator
               filters.merge(
                 page_number: last_page + 1,
                 update_time: Time.now,
-                last_id_written: last_id_written,
+                min_id_written: id_set.first,
+                max_id_written: id_set.last,
+                last_sequence_written: last_sequence_written,
                 is_page_complete: id_set.cardinality < PAGE_SIZE ? 0 : 1,
                 cumulative_prior_event_count: cumulative_prior_event_count,
                 event_count: id_set.cardinality,
