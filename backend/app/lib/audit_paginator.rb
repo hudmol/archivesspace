@@ -453,12 +453,9 @@ class AuditPaginator
   private
 
   def paginate_audit_records
-    max_sequence = nil
-
     DB.open do |db|
       AuditPaginator.refresh_page_lock!
       assign_sequence_numbers(db)
-      max_sequence = db[:audit_event].max(:sequence)
     end
 
     drain_pending_bulk_pages
@@ -475,14 +472,13 @@ class AuditPaginator
     # "any type"
     paginate_audit_records_for_type
 
-    archive_pages(max_sequence)
+    archive_pages
   end
 
-  def archive_pages(max_sequence)
+  def archive_pages
     max_unarchived_pages = AppConfig[:audit_logging_archive_threshold]
 
     return if max_unarchived_pages.nil?
-    return if max_sequence.nil?
 
     DB.open do |db|
       AuditPaginator.refresh_page_lock!
@@ -558,11 +554,15 @@ class AuditPaginator
       remove_ids = []
 
       db[:audit_event].each do |audit_event|
-        # Events without a sequence number haven't been paginated yet
+        # We need to be slightly careful when removing events because new events
+        # can arrive at any time, so there might be events that have been
+        # inserted but not yet paginated.  Those events will have a sequence of
+        # `nil` and should not be archived.
+        #
+        # Any other event with a non-nil sequence value can be assumed to have
+        # been paginated, because we eagerly paginate all events prior to
+        # running this archive step.
         next if audit_event.fetch(:sequence).nil?
-
-        # Events greater than max_sequence were added since we started running
-        next if audit_event.fetch(:sequence) > max_sequence
 
         next if live_ids.contains(audit_event.fetch(:id))
         remove_ids << audit_event.fetch(:id)
