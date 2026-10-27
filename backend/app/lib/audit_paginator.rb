@@ -354,7 +354,7 @@ class AuditPaginator
     model.model_scope(true) == :repository && model.columns.include?(:repo_id)
   end
 
-  def self.mark_everything_updated!
+  def self.mark_everything_updated!(object_types_filter = nil)
     now = Time.now
 
     audited_code_by_record_name = AuditEvent.object_type_codes.map {|code|
@@ -364,6 +364,11 @@ class AuditPaginator
     ASModel.all_models.each do |model|
       jsonmodel_cls = model.my_jsonmodel(true)
       if jsonmodel_cls && audited_code_by_record_name.has_key?(jsonmodel_cls.record_type)
+        if object_types_filter && !object_types_filter.include?(jsonmodel_cls.record_type)
+          # Skip this type because it's not in the filter
+          next
+        end
+
         Log.info("Generating update events for all records of type #{jsonmodel_cls.record_type}")
 
         repository_scoped = repository_scoped?(model)

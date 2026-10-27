@@ -20,14 +20,23 @@
                 <div class="subrecord-form-container">
                   <div class="subrecord-form-fields">
                     <%= t("activity_stream._frontend.reset_feed_information") %>
-                    <%= button_confirm_action(
-                        t("activity_stream._frontend.reset_feed"),
-                        url_for(:controller => :activity_stream, :action => :reset_feed),
-                        {
-                          :class => "btn btn-sm btn-danger"
-                        }
-                      )
-                    %>
+                    <%= form_tag url_for(:controller => :activity_stream, :action => :reset_feed) do %>
+                      <div class="form-group w-100 row required">
+                        <label class="col-sm-2 control-label text-right" for="object_types">Object Type(s)</label>
+                        <div class="col-sm-9">
+                          <select id="object_types" name="object_type[]" class="form-control" multiple required>
+                            <% @object_types.sort.each do |object_type| %>
+                              <option value="<%= object_type %>"><%= object_type %></option>
+                            <% end %>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="form-group w-100 row required">
+                        <div class="col-sm-9 offset-sm-2">
+                          <button type="submit" class="btn btn-sm btn-danger"><%= t("activity_stream._frontend.reset_feed") %></button>
+                        </div>
+                      </div>
+                    <% end %>
                   </div>
                 </div>
             </section>

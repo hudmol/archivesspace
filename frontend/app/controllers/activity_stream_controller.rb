@@ -6,6 +6,7 @@ class ActivityStreamController < ApplicationController
                                                   :reset_feed]
 
   def admin
+    @object_types = JSONModel::HTTP.get_json('/activity-stream/object_types').map{|uri| uri.split('/').last}
   end
 
   def exports
@@ -56,7 +57,7 @@ class ActivityStreamController < ApplicationController
   end
 
   def reset_feed
-    response = JSONModel::HTTP.post_form("/activity-stream/reset_feed")
+    response = JSONModel::HTTP.post_form("/activity-stream/reset_feed", 'object_type[]' => params[:object_type])
     if response.code == '200'
       flash[:success] = "Activity stream feed reset successfully."
     else

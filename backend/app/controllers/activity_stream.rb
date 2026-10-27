@@ -160,9 +160,14 @@ class ArchivesSpaceService < Sinatra::Base
     Endpoint.post('/activity-stream/reset_feed')
       .description("Reset the activity stream")
       .permissions([:manage_activity_stream])
+      .params(["object_type", [String], "The object types to reset"]) \
       .returns([200, "Reset the activity stream"]) \
     do
-      AuditPaginator.mark_everything_updated!
+      if ASUtils.wrap(params[:object_type]).empty?
+        raise BadParamsException.new("No object types specified")
+      end
+
+      AuditPaginator.mark_everything_updated!(params.fetch(:object_type))
       json_response({'status' => 'success'})
     end
   end
