@@ -30,6 +30,8 @@ describe 'AuditEvent controller' do
     enable_audit_logging
     @resource = create(:json_resource)
     @accession = create(:json_accession)
+
+    allow(AuditPaginator).to receive(:refresh_page_lock!)
   end
 
   it 'returns activity stream metadata for a specific object type' do

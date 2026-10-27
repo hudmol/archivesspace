@@ -93,6 +93,8 @@ describe 'AuditEvent model' do
     @resource = create(:json_resource)
     @another_resource = create(:json_resource)
     @accession = create(:json_accession)
+
+    allow(AuditPaginator).to receive(:refresh_page_lock!)
   end
 
   it 'marks merge events when there are multiple objects and the target is one of them' do
