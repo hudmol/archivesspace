@@ -82,7 +82,7 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
 
     page = 1
     while page <= stream_stats.last_page
-      current_page = AuditEvent.page(page, nil, exclude_system_generated: true)
+      current_page = AuditEvent.page(page, nil, exclude_system_generated: true, include_change_method: true)
       page += 1
 
       # Skip system pages

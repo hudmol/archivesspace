@@ -65,7 +65,7 @@ class AuditEvent
     archivesspace_uri("/activity-stream#{uri}")
   end
 
-  def self.render(event, include_context: true)
+  def self.render(event, include_context: true, include_change_method: false)
     return nil if event.nil?
 
     out = {}
@@ -80,7 +80,10 @@ class AuditEvent
       :name => event[:actor_name]
     }
     out[:type] = ACTIVITY_TYPE_CODE_TABLE[event[:activity_type]]
-    out[:method_of_change] = CHANGE_METHOD_CODE_TABLE[event[:change_method]]
+
+    if include_change_method
+      out[:method_of_change] = CHANGE_METHOD_CODE_TABLE[event[:change_method]]
+    end
 
     event[:records].each do |role, uris|
       role_label = ROLE_CODE_TABLE.fetch(role)
@@ -239,12 +242,12 @@ class AuditEvent
       when 'audit'
         ids = audit_page.event_ids
         out[:orderedItems] = find_events(db, {:event_ids => ids, :object_type => object_type}).map {|row|
-          render(row, include_context: false)
+          render(row, include_context: false, include_change_method: opts.fetch(:include_change_method, false))
         }
         out
       when 'archived'
         out[:orderedItems] = audit_page.extract_archive.map {|row|
-          render(row, include_context: false)
+          render(row, include_context: false, include_change_method: opts.fetch(:include_change_method, false))
         }
         out
       when 'bulk'
@@ -342,7 +345,7 @@ class AuditEvent
             actor_type: audit_page.page.fetch(:bulk_actor_type),
             records: records
           }
-        }.map {|row| render(row, include_context: false)}
+        }.map {|row| render(row, include_context: false, include_change_method: opts.fetch(:include_change_method, false))}
 
         out
       else
