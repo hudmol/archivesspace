@@ -124,7 +124,7 @@ class AuditPaginator
 
       result.each do |event|
         # Rehydrate our date objects
-        event[:timestamp] = DateTime.parse(event[:timestamp])
+        event[:timestamp] = Time.parse(event[:timestamp])
       end
 
       # :symbolize_names turns a key like "1" into :"1", but our original data
