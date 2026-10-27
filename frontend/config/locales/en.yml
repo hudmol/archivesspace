@@ -2620,7 +2620,7 @@ en:
       no_exports: No exports.
       general_error: Please provide all required fields and ensure your dates are in the correct format.
       reset_feed: Reset Feed
-      reset_feed_information: <p>Do you need to reset your activity stream? This action will populate the stream with all records to ensure your feed is up to date.</p>
+      reset_feed_information: <p>Do you need to reset your activity stream? This action will populate the stream with records for the object types selected, to ensure your feed is up to date.</p>
       activity_stream_export_criteria:
         user: User
         resource: Resource
