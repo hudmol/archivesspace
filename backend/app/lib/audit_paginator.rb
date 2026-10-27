@@ -20,10 +20,22 @@ class AuditPaginator
   # Likewise for moving pending bulk event pages into the audit_page table.
   MAX_BULK_PAGES_PER_ROUND = 250
 
-  MY_THREAD_ID = SecureRandom.hex
-
   # A safe margin for how long we might go without touching the lock
   LOCK_EXPIRE_SECONDS = 900
+
+  def self.my_thread_id
+    return @my_id if @my_id
+
+    dat_file = File.join(AppConfig[:data_directory], "audit_paginator_id.dat")
+    @my_id = File.read(dat_file) rescue nil
+
+    if @my_id.nil?
+      @my_id = SecureRandom.hex
+      File.write(dat_file, @my_id)
+    end
+
+    @my_id
+  end
 
   def self.start
     @thread ||= Thread.new do
@@ -53,7 +65,7 @@ class AuditPaginator
       now = Time.now
 
       if db[:audit_page_lock]
-           .filter(Sequel.~(lock_holder: MY_THREAD_ID))
+           .filter(Sequel.~(lock_holder: AuditPaginator.my_thread_id))
            .where { lock_expire_time >= now }
            .count > 0
         # Early out: someone holds the lock
@@ -64,13 +76,13 @@ class AuditPaginator
       row = db[:audit_page_lock].for_update.first or
         raise "Could not find a lock in table audit_page_lock.  Did the row get deleted by mistake?"
 
-      if row.fetch(:lock_holder) == MY_THREAD_ID || (row.fetch(:lock_expire_time) && now >= row.fetch(:lock_expire_time))
+      if row.fetch(:lock_holder) == AuditPaginator.my_thread_id || (row.fetch(:lock_expire_time) && now >= row.fetch(:lock_expire_time))
         # Clear existing/expired lock
-        Log.info("Paginator #{MY_THREAD_ID}: Clearing existing/expired lock: #{row}")
+        Log.info("Paginator #{AuditPaginator.my_thread_id}: Clearing existing/expired lock: #{row}")
         db[:audit_page_lock].filter(id: row.fetch(:id)).update(lock_holder: nil, lock_expire_time: nil)
       end
 
-      got_lock = (db[:audit_page_lock].filter(lock_holder: nil).update(lock_holder: MY_THREAD_ID, lock_expire_time: now + LOCK_EXPIRE_SECONDS) > 0)
+      got_lock = (db[:audit_page_lock].filter(lock_holder: nil).update(lock_holder: AuditPaginator.my_thread_id, lock_expire_time: now + LOCK_EXPIRE_SECONDS) > 0)
     end
 
     if got_lock
@@ -79,7 +91,7 @@ class AuditPaginator
       ensure
         # Release the lock
         DB.open do |db|
-          db[:audit_page_lock].filter(lock_holder: MY_THREAD_ID).update(lock_holder: nil, lock_expire_time: nil)
+          db[:audit_page_lock].filter(lock_holder: AuditPaginator.my_thread_id).update(lock_holder: nil, lock_expire_time: nil)
         end
       end
     else
@@ -90,7 +102,7 @@ class AuditPaginator
   def self.refresh_page_lock!
     DB.open do |db|
       now = Time.now
-      if db[:audit_page_lock].filter(lock_holder: MY_THREAD_ID).update(lock_expire_time: now + LOCK_EXPIRE_SECONDS) == 0
+      if db[:audit_page_lock].filter(lock_holder: AuditPaginator.my_thread_id).update(lock_expire_time: now + LOCK_EXPIRE_SECONDS) == 0
         raise "AuditPaginator lock refresh failed.  Did we time out while holding the lock?"
       end
     end
