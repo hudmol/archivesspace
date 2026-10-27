@@ -260,6 +260,80 @@ describe 'AuditEvent model' do
       expect(second_page[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(top_container.uri))
       expect(third_page[:orderedItems][0]['object'][:id]).to eq(AuditEvent.archivesspace_uri(@accession.uri))
     end
+
+    it 'renders bulk updates with the URIs records had at the time, even after they change repository' do
+      top_container = create(:json_top_container)
+      source_repo_id = $testdb[:top_container].filter(:id => top_container.id).get(:repo_id)
+      reset_audit_tables
+
+      RequestContext.open(:current_username => 'admin') do
+        AuditPaginator.log_bulk_update(TopContainer, [top_container.id])
+      end
+
+      expect($testdb[:audit_bulk_page_pending].select_map(:bulk_object_repo_id)).to eq([source_repo_id])
+
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      target_repo_id = make_test_repo('BULKMOVE')
+      $testdb[:top_container].filter(:id => top_container.id).update(:repo_id => target_repo_id)
+
+      item = AuditEvent.page(1, 'top_container')[:orderedItems].first
+      expect(item['object'][:id]).to eq(AuditEvent.archivesspace_uri(top_container.uri))
+      expect(item).not_to have_key('target')
+    end
+
+    it 'writes separate bulk pages for records in different repositories' do
+      first_container = create(:json_top_container)
+      first_repo_id = $testdb[:top_container].filter(:id => first_container.id).get(:repo_id)
+
+      second_repo_id = make_test_repo('BULKSPLIT')
+      second_container = create(:json_top_container)
+      reset_audit_tables
+
+      RequestContext.open(:current_username => 'admin') do
+        AuditPaginator.log_bulk_update(TopContainer, [first_container.id, second_container.id])
+      end
+
+      expect($testdb[:audit_bulk_page_pending].select_map([:bulk_object_repo_id, :event_count]))
+        .to match_array([[first_repo_id, 1], [second_repo_id, 1]])
+
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      rendered_uris = [1, 2].map {|page| AuditEvent.page(page, 'top_container')[:orderedItems].first['object'][:id] }
+      expect(rendered_uris).to match_array([first_container.uri, second_container.uri].map {|uri| AuditEvent.archivesspace_uri(uri) })
+    end
+
+    it 'renders bulk transfers with their source and target repositories' do
+      top_container = create(:json_top_container)
+      source_repo_id = $testdb[:top_container].filter(:id => top_container.id).get(:repo_id)
+      target_repo_id = make_test_repo('BULKXFER')
+      reset_audit_tables
+
+      RequestContext.open(:current_username => 'admin') do
+        AuditPaginator.log_bulk_transfer(TopContainer, source_repo_id, target_repo_id)
+      end
+      AuditPaginator.new.send(:drain_pending_bulk_pages)
+
+      source_uri = AuditEvent.archivesspace_uri(JSONModel(:top_container).uri_for(top_container.id, :repo_id => source_repo_id))
+      item = AuditEvent.page(1, 'top_container')[:orderedItems].find {|i| i['object'][:id] == source_uri }
+      expect(item).not_to be_nil
+      expect(item['target'][:id]).to eq(AuditEvent.archivesspace_uri(JSONModel(:top_container).uri_for(top_container.id, :repo_id => target_repo_id)))
+    end
+
+    it 'stores the repository on bulk pages of repository-scoped records written by a feed reset' do
+      top_container = create(:json_top_container)
+      repo_id = $testdb[:top_container].filter(:id => top_container.id).get(:repo_id)
+      reset_audit_tables
+
+      AuditPaginator.mark_everything_updated!
+
+      top_container_repos = $testdb[:audit_bulk_page_pending].filter(:page_filter => 'top_container').select_map(:bulk_object_repo_id)
+      expect(top_container_repos).to include(repo_id)
+      expect(top_container_repos).not_to include(nil)
+
+      # Repositories are global records, so there's no repository to store
+      expect($testdb[:audit_bulk_page_pending].filter(:page_filter => 'repository').select_map(:bulk_object_repo_id).uniq).to eq([nil])
+    end
   end
 
   describe 'pending bulk pages' do

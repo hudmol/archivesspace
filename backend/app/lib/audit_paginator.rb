@@ -331,6 +331,17 @@ class AuditPaginator
 
   MARK_EVERYTHING_BATCH_SIZE = 100_000
 
+  # How many record IDs to look up at once when finding their repositories
+  REPO_LOOKUP_BATCH_SIZE = 10_000
+
+  # Bulk pages for repository-scoped records store the repository the records
+  # were in, so they render with the URIs the records had at the time (like
+  # regular events do), rather than wherever the records live now.  This means
+  # writing a separate set of pages for each repository.
+  def self.repository_scoped?(model)
+    model.model_scope(true) == :repository && model.columns.include?(:repo_id)
+  end
+
   def self.mark_everything_updated!
     now = Time.now
 
@@ -343,38 +354,45 @@ class AuditPaginator
       if jsonmodel_cls && audited_code_by_record_name.has_key?(jsonmodel_cls.record_type)
         Log.info("Generating update events for all records of type #{jsonmodel_cls.record_type}")
 
-        AuditPaginator.add_bulk_events(
-          timestamp: now,
-          record_type: audited_code_by_record_name.fetch(jsonmodel_cls.record_type),
-          activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
-          change_method: AuditEvent::CHANGE_METHOD_MIGRATION,
-          actor_type: AuditEvent::ACTOR_TYPE_APPLICATION,
-          actor_name: 'admin',
-          object_repo: nil,
-          target_repo: nil,
-          system_generated: 1
-        ) do |events|
-          begin
-            min_id = model.min(:id)
-            max_id = model.max(:id)
+        repository_scoped = repository_scoped?(model)
+        repo_ids = repository_scoped ? model.distinct.select_map(:repo_id) : [nil]
 
-            if min_id && max_id
-              loop do
-                upper = min_id + MARK_EVERYTHING_BATCH_SIZE
+        repo_ids.each do |repo_id|
+          records = repository_scoped ? model.filter(:repo_id => repo_id) : model
 
-                model.where { (id >= min_id) & (id <= upper) }.select(:id).map(:id).each do |record_id|
-                  events << record_id
+          AuditPaginator.add_bulk_events(
+            timestamp: now,
+            record_type: audited_code_by_record_name.fetch(jsonmodel_cls.record_type),
+            activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
+            change_method: AuditEvent::CHANGE_METHOD_MIGRATION,
+            actor_type: AuditEvent::ACTOR_TYPE_APPLICATION,
+            actor_name: 'admin',
+            object_repo: repo_id,
+            target_repo: nil,
+            system_generated: 1
+          ) do |events|
+            begin
+              min_id = records.min(:id)
+              max_id = records.max(:id)
+
+              if min_id && max_id
+                loop do
+                  upper = min_id + MARK_EVERYTHING_BATCH_SIZE
+
+                  records.where { (id >= min_id) & (id <= upper) }.select(:id).map(:id).each do |record_id|
+                    events << record_id
+                  end
+
+                  break if upper >= max_id
+
+                  min_id = upper + 1
                 end
-
-                break if upper >= max_id
-
-                min_id = upper + 1
               end
+            rescue
+              Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
+              Log.exception($!)
+              raise $!
             end
-          rescue
-            Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
-            Log.exception($!)
-            raise $!
           end
         end
       end
@@ -426,25 +444,41 @@ class AuditPaginator
     record_type_code = AuditEvent.object_type_code_for(jsonmodel_cls.record_type)
     return unless record_type_code
 
-    AuditPaginator.add_bulk_events(
-      timestamp: now,
-      record_type: record_type_code,
-      activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
-      change_method: RequestContext.get(:change_method) || AuditEvent::CHANGE_METHOD_API,
-      actor_type: AuditEvent::ACTOR_TYPE_PERSON,
-      actor_name: RequestContext.get(:current_username),
-      object_repo: nil,
-      target_repo: nil,
-      system_generated: 0,
-    ) do |events|
-      begin
-        record_ids.each do |record_id|
-          events << record_id
+    record_ids_by_repo = if repository_scoped?(model)
+                           grouped = {}
+
+                           record_ids.each_slice(REPO_LOOKUP_BATCH_SIZE) do |batch|
+                             model.filter(:id => batch).select_map([:id, :repo_id]).each do |record_id, repo_id|
+                               (grouped[repo_id] ||= []) << record_id
+                             end
+                           end
+
+                           grouped
+                         else
+                           {nil => record_ids}
+                         end
+
+    record_ids_by_repo.each do |repo_id, repo_record_ids|
+      AuditPaginator.add_bulk_events(
+        timestamp: now,
+        record_type: record_type_code,
+        activity_type: AuditEvent::ACTIVITY_TYPE_UPDATE,
+        change_method: RequestContext.get(:change_method) || AuditEvent::CHANGE_METHOD_API,
+        actor_type: AuditEvent::ACTOR_TYPE_PERSON,
+        actor_name: RequestContext.get(:current_username),
+        object_repo: repo_id,
+        target_repo: nil,
+        system_generated: 0,
+      ) do |events|
+        begin
+          repo_record_ids.each do |record_id|
+            events << record_id
+          end
+        rescue
+          Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
+          Log.exception($!)
+          raise $!
         end
-      rescue
-        Log.error("Failure generating update events for type #{jsonmodel_cls.record_type}: #{$!}")
-        Log.exception($!)
-        raise $!
       end
     end
   end

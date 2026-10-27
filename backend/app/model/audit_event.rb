@@ -73,6 +73,7 @@ class AuditEvent
     out['@context'] = W3C_URL if include_context
 
     out[:id] = activity_stream_uri("/event/#{event[:event_id]}")
+
     out[:endTime] = event[:timestamp].rfc3339
     out[:actor] = {
       :type => ACTOR_TYPE_CODE_TABLE[event[:actor_type]],
@@ -260,18 +261,24 @@ class AuditEvent
           raise "Model not found for #{record_type}" unless model
 
           if audit_page.page[:bulk_object_repo_id]
-            # Bulk transfers give us all the repository information we need in
-            # the audit page itself, so constructing the URI is straightforward.
+            # Bulk pages of repository-scoped records give us all the repository
+            # information we need in the audit page itself, so constructing the
+            # URI is straightforward.  Transfers also record the repository the
+            # records moved to.
             record_ids.each do |record_id|
               record_uri_for_id[record_id] = {
-                AuditEvent::ROLE_OBJECT => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_object_repo_id]),
-                AuditEvent::ROLE_TARGET => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_target_repo_id])
+                AuditEvent::ROLE_OBJECT => model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_object_repo_id])
               }
+
+              # Include the target URI of the transfer too
+              if audit_page.page[:bulk_target_repo_id]
+                record_uri_for_id[record_id][AuditEvent::ROLE_TARGET] = model.my_jsonmodel.uri_for(record_id, repo_id: audit_page.page[:bulk_target_repo_id])
+              end
             end
           else
-            # Other bulk pages tell us the types and record IDs that were
-            # implicated, but it's up to us to reconstruct the URIs.  For live
-            # records, no problem, but finding the original URI of deleted
+            # Bulk pages of global records tell us the types and record IDs that
+            # were implicated, but it's up to us to reconstruct the URIs.  For
+            # live records, no problem, but finding the original URI of deleted
             # records takes some extra work.
 
             # Find the live records
