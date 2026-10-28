@@ -22,7 +22,9 @@
                     <%= t("activity_stream._frontend.reset_feed_information") %>
                     <%= form_tag url_for(:controller => :activity_stream, :action => :reset_feed) do %>
                       <div class="form-group w-100 row required">
-                        <label class="col-sm-2 control-label text-right" for="object_types">Object Type(s)</label>
+                        <label class="col-sm-2 control-label text-right" for="object_types">
+                          <%= t('activity_stream._frontend.activity_stream_export_criteria.object_types') %>
+                        </label>
                         <div class="col-sm-9">
                           <select id="object_types" name="object_type[]" class="form-control" multiple required>
                             <% @object_types.sort.each do |object_type| %>
