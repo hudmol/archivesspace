@@ -865,9 +865,11 @@ AppConfig[:search_default_scope] = 'all_record_types'
 
 # Audit logging disabled by default
 AppConfig[:enable_audit_logging] = false
+
 # When true, render uris as root-relative in the activity stream API
 # Default is to render full uris including scheme, host, etc
 AppConfig[:activity_stream_use_relative_uris] = false
+
 # Some object types are opt-in for audit logging
 # This array holds their jsonmodel names as strings
 # Supported optional types:

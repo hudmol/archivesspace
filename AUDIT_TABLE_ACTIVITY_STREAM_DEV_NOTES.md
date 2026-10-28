@@ -21,6 +21,7 @@ There are database migrations required for this functionality. The migrations
 add new tables. No existing table definitions or data are changed by the
 migrations. The new tables are:
 ```
+audit_bulk_page_pending
 audit_enabled_tracking
 audit_event
 audit_export
@@ -38,14 +39,29 @@ to `common/config/config-defaults.rb`:
 ```
 # Audit logging disabled by default
 AppConfig[:enable_audit_logging] = false
+
 # When true, render uris as root-relative in the activity stream API
 # Default is to render full uris including scheme, host, etc
 AppConfig[:activity_stream_use_relative_uris] = false
+
 # Some object types are opt-in for audit logging
 # This array holds their jsonmodel names as strings
 # Supported optional types:
 #   accession, location, assessment, permission, group, user
 AppConfig[:audit_logging_include_object_types] = []
+
+# For each activity stream, controls how many of the most recent pages will be
+# excluded from archiving.
+#
+# For example, a value of 10 will archive all but the 10-most-recent pages for
+# each activity stream.
+#
+# You can use this value to control the growth of rows in the `audit_event` and
+# `audit_record` tables.  As pages are archived, their rows are removed from
+# these tables.
+#
+# A value of `nil` (the default) disables archiving.
+AppConfig[:audit_logging_archive_threshold] = nil
 ```
 
 A minimal configuration that enables audit logging:
@@ -59,11 +75,16 @@ All endpoints for the Activity Stream API are GETs. There are currently no
 permissions required to hit these endpoints.
 ```
 /activity-stream
-/activity-stream/page/:page
+/activity-stream-export
+/activity-stream-export/:id
+/activity-stream-export/:id/download
 /activity-stream/:object_type
 /activity-stream/:object_type/page/:page
-/activity-stream/object_types
 /activity-stream/event/:id
+/activity-stream/object_types
+/activity-stream/page/:page
+/activity-stream/reset_feed
+/repositories/:repo_id/activity-stream-export/create
 ```
 
 ## Supported Object Types
@@ -84,6 +105,7 @@ top_container
 container_profile
 subject
 classification
+classification_term
 ```
 
 There are a number of ArchivesSpace models that are not included by default, but
@@ -114,13 +136,21 @@ GET /activity-stream/object_types
 Individual audit events are created by calls to `AuditEvent#log_event`. These
 calls are currently made in the following files:
 ```
-backend/app/model/ASModel_crud.rb
-backend/app/model/enumeration.rb
-backend/app/model/mixins/relationships.rb
-backend/app/model/mixins/tree_nodes.rb
-backend/app/model/top_container.rb
-backend/app/lib/component_transfer.rb
-backend/app/model/ASModel_transfers.rb
+backend/app/controllers/users.rb:
+backend/app/lib/component_transfer.rb:
+backend/app/model/ark_name.rb:
+backend/app/model/ASModel_crud.rb:
+backend/app/model/ASModel_transfers.rb:
+backend/app/model/audit_event.rb:
+backend/app/model/enumeration.rb:
+backend/app/model/group.rb:
+backend/app/model/mixins/relationships.rb:
+backend/app/model/mixins/tree_nodes.rb:
+backend/app/model/repository.rb:
+backend/app/model/top_container.rb:
+backend/spec/model_audit_event_spec.rb:
+backend/spec/model_bulk_import_job_spec.rb:
+backend/spec/model_job_spec.rb:
 ```
 Each call to `AuditEvent#log_event` will result in zero or one rows being
 inserted into `audit_event` and, if an event is inserted, then one or more
