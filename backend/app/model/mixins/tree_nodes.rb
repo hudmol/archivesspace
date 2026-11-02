@@ -68,7 +68,14 @@ module TreeNodes
       current_logical_position = ordered_siblings.where { position < current_physical_position }.count
 
       # If we are already at the correct logical position, do nothing
-      return if (target_logical_position == current_logical_position)
+      if target_logical_position == current_logical_position
+        RequestContext.open(:change_method => AuditEvent::CHANGE_METHOD_REORDER) do
+          AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
+                               AuditEvent::ROLE_OBJECT => self.uri)
+        end
+
+        return
+      end
 
       # We'll determine which node will fall to the left of our moved node, and
       # which will fall to the right.  We're going to set our physical position to
