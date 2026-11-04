@@ -20,13 +20,7 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
     EXPORT_STATUS_ERRORED = 'EXPORT_STATUS_ERRORED',
   ]
 
-  class FakeUser
-    def id
-      1
-    end
-  end
-
-  def self.queue_with_criteria(type = EXPORT_TYPE_USER, criteria = {})
+  def self.queue_with_criteria(current_user, type = EXPORT_TYPE_USER, criteria = {})
     unless EXPORT_TYPES.include?(type)
       raise "Invalid export type: #{type}"
     end
@@ -39,7 +33,7 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
     export.export_type = type
     export.status = EXPORT_STATUS_QUEUED
 
-    export.created_by = RequestContext.get(:current_username) || 'admin'
+    export.created_by = current_user.username
     export.create_time = Time.now
     export.system_mtime = Time.now
 
@@ -51,7 +45,7 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
             job: {
               'jsonmodel_type' => 'activity_stream_export_job',
             },
-          }), user: FakeUser.new) # FIXME current_user
+          }), user: current_user)
 
     export.job_id = job.id
     export.save

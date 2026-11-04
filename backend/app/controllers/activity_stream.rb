@@ -123,7 +123,7 @@ class ArchivesSpaceService < Sinatra::Base
 
       ActivityStreamExport.validate_criteria!(params[:export_type], criteria)
 
-      export = ActivityStreamExport.queue_with_criteria(params[:export_type], criteria)
+      export = ActivityStreamExport.queue_with_criteria(current_user, params[:export_type], criteria)
       json_response({'id' => export.id, 'job_id' => export.job_id, 'status' => export.status})
     end
 
