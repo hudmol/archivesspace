@@ -74,8 +74,9 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
 
     return if stream_stats.last_page.nil?
 
+    beyond_date_range = false
     page = 1
-    while page <= stream_stats.last_page
+    while !beyond_date_range && page <= stream_stats.last_page
       current_page = AuditEvent.page(page, nil, exclude_system_generated: true, include_change_method: true)
       page += 1
 
@@ -86,6 +87,11 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
 
       current_page.fetch(:orderedItems).each do |event|
         event = deep_keys_as_strings(event)
+
+        if criteria['to_date'] && event_after_date?(event, criteria.fetch('to_date'))
+          beyond_date_range = true
+          break
+        end
 
         ASUtils.wrap(event.fetch('object')).each do |event_record|
           record_uri = event_record.fetch('id').sub(AppConfig[:backend_url], '/').sub('//', '/')
@@ -150,6 +156,11 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
     else
       value
     end
+  end
+
+  def event_after_date?(event, date_string)
+    date_of_event_in_local_time = Time.parse(event.fetch('endTime')).getlocal.strftime('%Y-%m-%d')
+    date_of_event_in_local_time > date_string
   end
 
   def event_matches_criteria?(event, record_uri, record_type, criteria)
