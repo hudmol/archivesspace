@@ -135,6 +135,15 @@ class ArchivesSpaceService < Sinatra::Base
       json_response({'all_exports_completed' => ActivityStreamExport.all_completed?})
     end
 
+    Endpoint.post('/activity-stream-export/clear-all')
+      .description("Clear all activity stream exports")
+      .permissions([:manage_activity_stream])
+      .returns([200, "JSON status OK"]) \
+    do
+      ActivityStreamExport.clear_all!
+      json_response({'status' => 'success'})
+    end
+
     Endpoint.get('/activity-stream-export/:id')
       .description("Fetch an activity stream export")
       .permissions([:view_activity_stream])

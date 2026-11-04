@@ -32,6 +32,19 @@
             <br>
             <p>
               <button class="btn btn-default" id="showCreateExportButton" data-modal-title="<%= t('activity_stream._frontend.action.create_export') %>"><%= t('activity_stream._frontend.action.create_export') %></button>
+              <% if user_can?('manage_activity_stream') %>
+                <%= button_confirm_action(
+                  t('activity_stream._frontend.action.clear_exports'),
+                  url_for({:action => :clear_exports}),
+                  {
+                    :class => "btn btn-danger float-right",
+                    :"data-title" => t('activity_stream._frontend.action.clear_exports_confirm_title'),
+                    :"data-message" => t('activity_stream._frontend.action.clear_exports_confirm_message'),
+                    :"data-confirm-btn-label" => t('activity_stream._frontend.action.clear_exports'),
+                    :"data-confirm-btn-class" => "btn-danger",
+                  })
+                %>
+              <% end %>
             </p>
             <% if @search_data['results'].length %>
               <div class="table-responsive">

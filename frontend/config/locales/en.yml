@@ -2641,6 +2641,9 @@ en:
         submit_export: Submit Export
         download_export: Download
         exports_complete_reload: Refresh Page
+        clear_exports: Clear All Exports
+        clear_exports_confirm_title: Clear All Exports?
+        clear_exports_confirm_message: Are you sure you want to clear all exports? This action will delete all export CSV files and cannot be undone.
       messages:
         export_created: Export created successfully. Once complete the download will be available from this page.
         export_error: Error creating export. Please ensure all required fields are filled out and your dates are in the correct format.
@@ -2648,3 +2651,5 @@ en:
         reset_feed_error: Error resetting activity stream.
         all_exports_completed: All exports have completed. Please refresh the page to see the download links.
         exports_running: Exports are still running...
+        clear_exports_success: All exports cleared successfully.
+        clear_exports_error: Error clearing exports.

@@ -4,7 +4,8 @@ class ActivityStreamController < ApplicationController
                                                 :export_download,
                                                 :poll_for_completed_exports]
   set_access_control 'manage_activity_stream' => [:admin,
-                                                  :reset_feed]
+                                                  :reset_feed,
+                                                  :clear_exports]
 
   def admin
     @object_types = JSONModel::HTTP.get_json('/activity-stream/object_types').map{|uri| uri.split('/').last}
@@ -73,5 +74,16 @@ class ActivityStreamController < ApplicationController
   def poll_for_completed_exports
     response = JSONModel::HTTP.get_json("/activity-stream-export/poll-for-completed")
     render :json => response
+  end
+
+  def clear_exports
+    response = JSONModel::HTTP.post_form("/activity-stream-export/clear-all")
+    if response.code == '200'
+      flash[:success] = I18n.t('activity_stream._frontend.messages.clear_exports_success')
+    else
+      flash[:error] = I18n.t('activity_stream._frontend.messages.clear_exports_error')
+    end
+
+    redirect_to :action => :exports
   end
 end

@@ -398,4 +398,23 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
   def self.all_completed?
     ActivityStreamExport.filter(:status => [EXPORT_STATUS_QUEUED, EXPORT_STATUS_RUNNING]).count == 0
   end
+
+  def self.clear_all!
+    Log.info("ActivityStreamExport::Clearing all activity stream exports and deleting export files")
+
+    ActivityStreamExport.each do |export|
+      Log.info("ActivityStreamExport::Clearing export #{export.id}")
+      if export.export_file_path
+        begin
+          File.unlink(File.join(AppConfig[:job_file_path], export.export_file_path))
+        rescue
+          Log.error("ActivityStreamExport::Failed to delete export file #{export.export_file_path} for export #{export.id}")
+        end
+      end
+
+      export.delete
+    end
+
+    Log.info("ActivityStreamExport::All done")
+  end
 end
