@@ -16,11 +16,11 @@
         <div class="tab-content">
           <div class="tab-pane active">
             <section class="subrecord-form">
-                <h3><%= t("activity_stream._frontend.reset_feed") %></h3>
+                <h3><%= t("activity_stream._frontend.resync_feed") %></h3>
                 <div class="subrecord-form-container">
                   <div class="subrecord-form-fields">
-                    <%= t("activity_stream._frontend.reset_feed_information") %>
-                    <%= form_tag url_for(:controller => :activity_stream, :action => :reset_feed) do %>
+                    <%= t("activity_stream._frontend.resync_feed_information") %>
+                    <%= form_tag url_for(:controller => :activity_stream, :action => :resync_feed) do %>
                       <div class="form-group w-100 row required">
                         <label class="col-sm-2 control-label text-right" for="object_types">
                           <%= t('activity_stream._frontend.activity_stream_export_criteria.object_types') %>
@@ -35,7 +35,7 @@
                       </div>
                       <div class="form-group w-100 row required">
                         <div class="col-sm-9 offset-sm-2">
-                          <button type="submit" class="btn btn-sm btn-danger"><%= t("activity_stream._frontend.reset_feed") %></button>
+                          <button type="submit" class="btn btn-sm btn-danger"><%= t("activity_stream._frontend.resync_feed") %></button>
                         </div>
                       </div>
                     <% end %>

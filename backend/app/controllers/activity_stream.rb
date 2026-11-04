@@ -174,11 +174,11 @@ class ArchivesSpaceService < Sinatra::Base
       end
     end
 
-    Endpoint.post('/activity-stream/reset_feed')
-      .description("Reset the activity stream")
+    Endpoint.post('/activity-stream/resync_feed')
+      .description("Resync the activity stream")
       .permissions([:manage_activity_stream])
-      .params(["object_type", [String], "The object types to reset"]) \
-      .returns([200, "Reset the activity stream"]) \
+      .params(["object_type", [String], "The object types to resync"]) \
+      .returns([200, "Resync the activity stream"]) \
     do
       if ASUtils.wrap(params[:object_type]).empty?
         raise BadParamsException.new("No object types specified")

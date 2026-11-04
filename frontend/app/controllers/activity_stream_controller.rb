@@ -4,7 +4,7 @@ class ActivityStreamController < ApplicationController
                                                 :export_download,
                                                 :poll_for_completed_exports]
   set_access_control 'manage_activity_stream' => [:admin,
-                                                  :reset_feed,
+                                                  :resync_feed,
                                                   :clear_exports]
 
   def admin
@@ -60,12 +60,12 @@ class ActivityStreamController < ApplicationController
     end
   end
 
-  def reset_feed
-    response = JSONModel::HTTP.post_form("/activity-stream/reset_feed", 'object_type[]' => params[:object_type])
+  def resync_feed
+    response = JSONModel::HTTP.post_form("/activity-stream/resync_feed", 'object_type[]' => params[:object_type])
     if response.code == '200'
-      flash[:success] = I18n.t('activity_stream._frontend.messages.reset_feed_success')
+      flash[:success] = I18n.t('activity_stream._frontend.messages.resync_feed_success')
     else
-      flash[:error] = I18n.t('activity_stream_frontend..messages.reset_feed_error')
+      flash[:error] = I18n.t('activity_stream._frontend.messages.resync_feed_error')
     end
 
     redirect_to :action => :admin

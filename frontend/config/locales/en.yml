@@ -2619,8 +2619,8 @@ en:
       export_status_errored: Errored
       no_exports: No exports.
       general_error: Please provide all required fields and ensure your dates are in the correct format.
-      reset_feed: Reset Feed
-      reset_feed_information: <p>Do you need to reset your activity stream? This action will populate the stream with records for the object types selected, to ensure your feed is up to date.</p>
+      resync_feed: Resync Feed
+      resync_feed_information: <p>Do you need to resync your activity stream? This action will populate the stream with records for the object types selected, to ensure your feed is up to date.</p>
       activity_stream_export_criteria:
         user: User
         resource: Resource
@@ -2647,8 +2647,8 @@ en:
       messages:
         export_created: Export created successfully. Once complete the download will be available from this page.
         export_error: Error creating export. Please ensure all required fields are filled out and your dates are in the correct format.
-        reset_feed_success: Activity stream reset successfully. The feed will be repopulated with records for the object types selected.
-        reset_feed_error: Error resetting activity stream.
+        resync_feed_success: Activity stream resynced successfully. The feed will be repopulated with records for the object types selected.
+        resync_feed_error: Error resyncing activity stream.
         all_exports_completed: All exports have completed. Please refresh the page to see the download links.
         exports_running: Exports are still running...
         clear_exports_success: All exports cleared successfully.
