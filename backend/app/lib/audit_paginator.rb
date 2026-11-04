@@ -711,6 +711,10 @@ class AuditPaginator
 
         return unless page_updated
 
+        (earliest_event_timestamp, latest_event_timestamp) =
+          db[:audit_event].filter(id: id_set.to_a)
+            .get { [min(timestamp).as(:earliest), max(timestamp).as(:latest)] }
+
         id_set.run_optimize
 
         if page_in_progress
@@ -719,6 +723,8 @@ class AuditPaginator
             .filter(id: page_in_progress.fetch(:id))
             .update(min_id_written: id_set.first,
                     max_id_written: id_set.last,
+                    earliest_event_timestamp: earliest_event_timestamp,
+                    latest_event_timestamp: latest_event_timestamp,
                     last_sequence_written: last_sequence_written,
                     update_time: Time.now,
                     id_set: AuditPaginator.id_set_to_bytes(id_set),
@@ -737,6 +743,8 @@ class AuditPaginator
                 update_time: Time.now,
                 min_id_written: id_set.first,
                 max_id_written: id_set.last,
+                earliest_event_timestamp: earliest_event_timestamp,
+                latest_event_timestamp: latest_event_timestamp,
                 last_sequence_written: last_sequence_written,
                 is_page_complete: id_set.cardinality < PAGE_SIZE ? 0 : 1,
                 cumulative_prior_event_count: next_position.cumulative_prior_event_count,
@@ -816,6 +824,8 @@ class AuditPaginator
             page_filter: page_filter,
             page_event_type: 'bulk',
             page_number: next_position.next_page_number,
+            earliest_event_timestamp: pending_page.fetch(:update_time),
+            latest_event_timestamp: pending_page.fetch(:update_time),
             last_sequence_written: -1,
             is_page_complete: 1,
             cumulative_prior_event_count: next_position.cumulative_prior_event_count,
