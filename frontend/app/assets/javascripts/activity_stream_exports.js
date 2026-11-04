@@ -1,8 +1,8 @@
-(function() {
+(function(window) {
   document.getElementById('showCreateExportButton').addEventListener('click', function() {
     const $modal = AS.openCustomModal(
       'createExportModal',
-      "Create an Activity Stream Export",
+      $(this).data('modal-title'),
       AS.renderTemplate('create_export_popup_template', {}),
       'full',
       {},
@@ -59,7 +59,28 @@
         }
       });
     });
-
-
   });
-})();
+
+  if (document.getElementById('allExportsCompletedMessage')) {
+    document.getElementById('reloadPage').addEventListener('click', function() {
+      window.location.reload();
+    });
+
+    function pollForCompletedExports() {
+      fetch('/activity_stream/exports/poll-for-completed')
+        .then(response => response.json())
+        .then(data => {
+          if (data.all_exports_completed) {
+            document.getElementById('exportsRunningMessage').style.display = 'none';
+            document.getElementById('allExportsCompletedMessage').style.display = 'block';
+          } else {
+            document.getElementById('exportsRunningMessage').style.display = 'block';
+            document.getElementById('allExportsCompletedMessage').style.display = 'none';
+            setTimeout(pollForCompletedExports, 5000);
+          }
+        });
+    }
+
+    setTimeout(pollForCompletedExports, 2000);
+  }
+})(window);

@@ -1,7 +1,8 @@
 class ActivityStreamController < ApplicationController
   set_access_control 'view_activity_stream' => [:exports,
                                                 :export_create,
-                                                :export_download]
+                                                :export_download,
+                                                :poll_for_completed_exports]
   set_access_control 'manage_activity_stream' => [:admin,
                                                   :reset_feed]
 
@@ -11,6 +12,7 @@ class ActivityStreamController < ApplicationController
 
   def exports
     @object_types = JSONModel::HTTP.get_json('/activity-stream/object_types').map{|uri| uri.split('/').last}
+    @exports_running = !JSONModel::HTTP.get_json('/activity-stream-export/poll-for-completed').fetch('all_exports_completed')
     @search_data = JSONModel(:activity_stream_export).all(
       page: [Integer(params[:page] || 1), 1].max,
       page_size: 10,
@@ -29,10 +31,11 @@ class ActivityStreamController < ApplicationController
         params[:criteria].to_json)
 
     if response.code == '200'
-      flash[:success] = "Export created successfully. Once complete the download will be available from this page."
+      flash[:success] = I18n.t('activity_stream._frontend.messages.export_created')
       render :json => {:status => "SUCCESS"}
     else
-      render :json => {:status => "ERROR"}
+      error_data = ASUtils.json_parse(response.body).fetch('error', "Unknown error") rescue response.body
+      render :json => {:status => "ERROR", :error => error_data}
     end
   end
 
@@ -59,11 +62,16 @@ class ActivityStreamController < ApplicationController
   def reset_feed
     response = JSONModel::HTTP.post_form("/activity-stream/reset_feed", 'object_type[]' => params[:object_type])
     if response.code == '200'
-      flash[:success] = "Activity stream feed reset successfully."
+      flash[:success] = I18n.t('activity_stream._frontend.messages.reset_feed_success')
     else
-      flash[:error] = "Activity stream failed to reset."
+      flash[:error] = I18n.t('activity_stream_frontend..messages.reset_feed_error')
     end
 
     redirect_to :action => :admin
+  end
+
+  def poll_for_completed_exports
+    response = JSONModel::HTTP.get_json("/activity-stream-export/poll-for-completed")
+    render :json => response
   end
 end

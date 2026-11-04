@@ -2640,3 +2640,11 @@ en:
         create_export: Create Export
         submit_export: Submit Export
         download_export: Download
+        exports_complete_reload: Refresh Page
+      messages:
+        export_created: Export created successfully. Once complete the download will be available from this page.
+        export_error: Error creating export. Please ensure all required fields are filled out and your dates are in the correct format.
+        reset_feed_success: Activity stream reset successfully. The feed will be repopulated with records for the object types selected.
+        reset_feed_error: Error resetting activity stream.
+        all_exports_completed: All exports have completed. Please refresh the page to see the download links.
+        exports_running: Exports are still running...

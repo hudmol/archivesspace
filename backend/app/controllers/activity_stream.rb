@@ -127,6 +127,14 @@ class ArchivesSpaceService < Sinatra::Base
       json_response({'id' => export.id, 'job_id' => export.job_id, 'status' => export.status})
     end
 
+    Endpoint.get('/activity-stream-export/poll-for-completed')
+      .description("Return true if all exports have completed")
+      .permissions([:view_activity_stream])
+      .returns([200, "JSON with boolean indicating if all exports have completed"]) \
+    do
+      json_response({'all_exports_completed' => ActivityStreamExport.all_completed?})
+    end
+
     Endpoint.get('/activity-stream-export/:id')
       .description("Fetch an activity stream export")
       .permissions([:view_activity_stream])

@@ -394,4 +394,8 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
       raise "Invalid export type: #{export_type}"
     end
   end
+
+  def self.all_completed?
+    ActivityStreamExport.filter(:status => [EXPORT_STATUS_QUEUED, EXPORT_STATUS_RUNNING]).count == 0
+  end
 end
