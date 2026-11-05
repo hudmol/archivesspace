@@ -69,7 +69,8 @@ module TreeNodes
 
       # If we are already at the correct logical position, do nothing
       if target_logical_position == current_logical_position
-        RequestContext.open(:change_method => AuditEvent::CHANGE_METHOD_REORDER) do
+        # If this is a reorder/drag-and-drop operation, we want to log an audit event for the affected record
+        if RequestContext.get(:change_method) == AuditEvent::CHANGE_METHOD_REORDER
           AuditEvent.log_event(AuditEvent::ACTIVITY_TYPE_UPDATE,
                                AuditEvent::ROLE_OBJECT => self.uri)
         end
@@ -216,8 +217,10 @@ module TreeNodes
 
 
   def set_parent_and_position(parent_id, position)
-    self.class.retry_db_update do
-      attempt_set_parent_and_position(parent_id, position)
+    RequestContext.open(:change_method => AuditEvent::CHANGE_METHOD_REORDER) do
+      self.class.retry_db_update do
+        attempt_set_parent_and_position(parent_id, position)
+      end
     end
   end
 
