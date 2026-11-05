@@ -217,10 +217,12 @@ module TreeNodes
 
 
   def set_parent_and_position(parent_id, position)
-    RequestContext.open(:change_method => AuditEvent::CHANGE_METHOD_REORDER) do
-      self.class.retry_db_update do
-        attempt_set_parent_and_position(parent_id, position)
-      end
+    if RequestContext.get(:change_method) == AuditEvent::CHANGE_METHOD_FORM
+      RequestContext.set(:change_method, AuditEvent::CHANGE_METHOD_REORDER)
+    end
+
+    self.class.retry_db_update do
+      attempt_set_parent_and_position(parent_id, position)
     end
   end
 
