@@ -53,6 +53,23 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
     export
   end
 
+  def each_page_for_range(from_date, to_date)
+    from_date_time = from_date + 'T00:00:00'
+    to_date_time = to_date + 'T23:59:59'
+
+    DB.open do |db|
+      db[:audit_page]
+        .filter(Sequel.qualify(:audit_page, :earliest_event_timestamp) <= to_date_time)
+        .filter(Sequel.qualify(:audit_page, :latest_event_timestamp) >= from_date_time)
+        .filter(Sequel.qualify(:audit_page, :page_filter) => AuditPaginator::ANY_TYPE)
+        .select(:page_number)
+        .order(Sequel.asc(Sequel.qualify(:audit_page, :page_number)))
+        .each do |row|
+          yield AuditEvent.page(row[:page_number], nil, exclude_system_generated: true, include_change_method: true)
+        end
+    end
+  end
+
   def write_csv(file)
     criteria = ASUtils.json_parse(self.criteria)
     stream_stats = DB.open do |db|
@@ -74,11 +91,7 @@ class ActivityStreamExport < Sequel::Model(:audit_export)
 
     return if stream_stats.last_page.nil?
 
-    page = 1
-    while page <= stream_stats.last_page
-      current_page = AuditEvent.page(page, nil, exclude_system_generated: true, include_change_method: true)
-      page += 1
-
+    each_page_for_range(criteria.fetch('from_date'), criteria.fetch('to_date')) do |current_page|
       # Skip system pages
       if current_page.nil?
         next
