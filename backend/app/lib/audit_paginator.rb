@@ -53,7 +53,7 @@ class AuditPaginator
         Log.error("Unexpected error in AuditPaginator thread: #{e}")
         Log.exception(e)
       ensure
-        sleep 5
+        sleep 1
       end
     end
   end
@@ -544,6 +544,8 @@ class AuditPaginator
       archivable_pages = []
 
       max_page_by_filter.each do |page_filter, max_page|
+        break if archivable_pages.length >= MAX_PAGES_ARCHIVED_PER_ROUND
+
         max_archivable_page = max_page - max_unarchived_pages
 
         db[:audit_page]
@@ -564,6 +566,11 @@ class AuditPaginator
       # Nothing to archive, and therefore nothing to do
       return if archivable_pages.empty?
 
+      # As pages are archived, mark their events for consideration in the sweep
+      # process below.  If an event is only referenced by archived pages, it can
+      # be removed.
+      possibly_obsolete_event_ids = RoaringBitmap.new
+
       archivable_pages.each do |page_id|
         AuditPaginator.refresh_page_lock!
 
@@ -574,6 +581,10 @@ class AuditPaginator
 
         if filter == ANY_TYPE
           filter = nil
+        end
+
+        ids.each do |event_id|
+          possibly_obsolete_event_ids.add(event_id)
         end
 
         events = JSON.dump(AuditEvent.find_events(db, {:object_type => filter, :event_ids => ids}))
@@ -590,40 +601,31 @@ class AuditPaginator
           )
       end
 
-      # Sweep our audit tables for rows that are now fully archived (not
-      # referenced by any 'audit' page)
-      live_ids = RoaringBitmap.new
-      db[:audit_page].filter(page_event_type: 'audit').each do |row|
+      # Remove any event IDs from `possibly_obsolete_event_ids` that still
+      # belong to a live audit page.
+      first_obsolete_candidate_id = possibly_obsolete_event_ids.first
+      last_obsolete_candidate_id = possibly_obsolete_event_ids.last
+
+      db[:audit_page]
+        .filter(page_event_type: 'audit')
+        .where { min_id_written <= last_obsolete_candidate_id }
+        .where { max_id_written >= first_obsolete_candidate_id }
+        .each do |row|
         id_set = RoaringBitmap.new
         id_set.deserialize(ByteBuffer.wrap(row.fetch(:id_set)
                                              .force_encoding(Encoding::ASCII_8BIT)
                                              .to_java_bytes))
 
-        live_ids.or(id_set)
+        possibly_obsolete_event_ids.andNot(id_set)
       end
 
-      remove_ids = []
-
-      db[:audit_event].each do |audit_event|
-        # We need to be slightly careful when removing events because new events
-        # can arrive at any time, so there might be events that have been
-        # inserted but not yet paginated.  Those events will have a sequence of
-        # `nil` and should not be archived.
-        #
-        # Any other event with a non-nil sequence value can be assumed to have
-        # been paginated, because we eagerly paginate all events prior to
-        # running this archive step.
-        next if audit_event.fetch(:sequence).nil?
-
-        next if live_ids.contains(audit_event.fetch(:id))
-        remove_ids << audit_event.fetch(:id)
-      end
+      remove_ids = possibly_obsolete_event_ids.to_a
 
       unless remove_ids.empty?
         db[:audit_record].filter(audit_event_id: remove_ids).delete
-        db[:audit_event].filter(id: remove_ids).delete
+        delete_count = db[:audit_event].filter(id: remove_ids).delete
 
-        Log.info("Archived #{remove_ids.length} event records")
+        Log.info("Archived #{delete_count} event records")
       end
     end
   end
