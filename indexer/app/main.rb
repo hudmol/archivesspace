@@ -6,6 +6,8 @@ require_relative 'lib/periodic_indexer'
 require_relative 'lib/realtime_indexer'
 require_relative 'lib/pui_indexer'
 
+require_relative 'lib/moma_finding_aid_indexer'
+
 # JRuby 9.3.0.0 introduced more nuanced thread teardowns.
 # See: https://github.com/jruby/jruby/pull/6176
 # Under the assumption that the thread dump facility is not widely
@@ -28,6 +30,7 @@ class ArchivesSpaceIndexer < Sinatra::Base
   def self.main
     periodic_indexer = PeriodicIndexer.get_indexer
     pui_indexer = PUIIndexer.get_indexer
+    moma_finding_aid_indexer = MOMAFindingAidIndexer.get_indexer
 
     threads = []
 
@@ -53,6 +56,16 @@ class ArchivesSpaceIndexer < Sinatra::Base
         end
       end
     end
+
+    Log.info("Starting MOMA finding aid indexer")
+    threads << Thread.new do
+      begin
+        moma_finding_aid_indexer.run
+      rescue
+        Log.error("Unexpected failure in MOMA finding aid indexer: #{$!}")
+      end
+    end
+
 
     sleep 5
 

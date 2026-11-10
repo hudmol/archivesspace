@@ -1,0 +1,87 @@
+<%#
+  Resource -> HTML finding-aid front matter fragment.
+
+  Input:  `record`  (a parsed ArchivesSpace resource JSON, jsonmodel_type "resource")
+  Output: a self-contained HTML fragment (no <html>/<head>/<body>) meant to be
+          concatenated ahead of the archival_object fragments and dropped into a
+          <main class="finding-aid"> wrapper that pulls in finding_aid.css.
+
+  Helper methods (h, ead_inline, display_title, ...) live in finding_aid_helpers.rb.
+-%>
+<section class="fa-head" id="top">
+  <h1 class="fa-title"><%= display_title(record) %></h1>
+<%- if record['id_0'] && !record['id_0'].to_s.empty? -%>
+  <p class="fa-id"><%= h(record['id_0']) %></p>
+<%- end -%>
+<%- fa_meta = [record['finding_aid_author'], record['finding_aid_date'],
+               record['finding_aid_language_note'], record['finding_aid_edition_statement']]
+              .compact.map(&:to_s).reject(&:empty?) -%>
+<%- unless fa_meta.empty? -%>
+  <div class="fa-meta">
+<%- fa_meta.each do |line| -%>
+    <p><%= ead_inline(line) %></p>
+<%- end -%>
+  </div>
+<%- end -%>
+</section>
+
+<section class="fa-overview" aria-labelledby="overview-heading">
+  <h2 id="overview-heading">Overview</h2>
+  <dl class="fa-summary">
+<%- creators = linked_agents(record, 'creator') -%>
+<%- unless creators.empty? -%>
+    <dt>Creator</dt>
+    <dd><%= creators.map { |c| h(c) }.join('; ') %></dd>
+<%- end -%>
+    <dt>Title</dt>
+    <dd><%= display_title(record) %></dd>
+<%- dates = unit_dates(record) -%>
+<%- unless dates.empty? -%>
+    <dt>Dates</dt>
+    <dd><%= h(dates) %></dd>
+<%- end -%>
+<%- extent = extent_statement(record) -%>
+<%- unless extent.empty? -%>
+    <dt>Quantity</dt>
+    <dd><%= h(extent) %></dd>
+<%- end -%>
+<%- langs = languages(record) -%>
+<%- unless langs.empty? -%>
+    <dt>Language</dt>
+    <dd><%= h(langs.join(', ')) %></dd>
+<%- end -%>
+<%- if record['id_0'] && !record['id_0'].to_s.empty? -%>
+    <dt>Identifier</dt>
+    <dd><%= h(record['id_0']) %></dd>
+<%- end -%>
+<%- unless (record['level'] || '').empty? -%>
+    <dt>Level</dt>
+    <dd><%= h(record['level'].capitalize) %></dd>
+<%- end -%>
+  </dl>
+</section>
+
+<%- ordered_notes(record).each do |note| -%>
+<section class="fa-note note-<%= h(note['type']) %>">
+<%- if note['label'] && !note['label'].to_s.empty? -%>
+  <h2><%= h(note['label']) %></h2>
+<%- end -%>
+  <%= render_note_body(note) %>
+</section>
+<%- end -%>
+
+<%- subjects = index_terms(record, 'subjects') -%>
+<%- if subjects.any? -%>
+<section class="fa-index">
+  <h2>Index Terms</h2>
+  <ul class="fa-terms">
+<%- subjects.each do |term| -%>
+    <li><%= h(term) %></li>
+<%- end -%>
+  </ul>
+</section>
+<%- end -%>
+
+<section class="fa-contents">
+  <h2 id="contents">Container List</h2>
+</section>

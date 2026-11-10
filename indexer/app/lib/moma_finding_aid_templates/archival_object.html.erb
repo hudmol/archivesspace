@@ -1,0 +1,47 @@
+<%#
+  Archival Object -> HTML finding-aid component fragment.
+
+  Input:  `record`  (a parsed ArchivesSpace archival_object JSON)
+  Output: a self-contained HTML fragment for one component.
+
+  Fragments are concatenated in tree order (each parent immediately followed by
+  its descendants) and share one flat wrapper. Hierarchy is expressed visually
+  through indentation driven by the component's depth (its number of ancestors),
+  set on the `--depth` custom property -- not by nesting elements, which would
+  require open/close tags to span separate fragments.
+
+  Two shapes:
+    * grouping levels (series, subseries, recordgrp, ...) render as a heading
+      block that introduces the components beneath it;
+    * item levels (file, item) render as an id / title / date row.
+-%>
+<%- if grouping?(record) -%>
+<section class="fa-series" style="--depth: <%= depth(record) %>"<%= record['ref_id'] ? %( id="#{h(record['ref_id'])}") : '' %>>
+  <h3 class="series-title">
+    <span class="series-name"><%= display_title(record) %></span>
+<%- d = unit_dates(record) -%>
+<%- unless d.empty? -%>
+    <span class="unit-date"><%= h(d) %></span>
+<%- end -%>
+  </h3>
+<%- ordered_notes(record).each do |note| -%>
+  <div class="fa-note note-<%= h(note['type']) %>">
+<%- if note['label'] && !note['label'].to_s.empty? && note['type'] != 'scopecontent' -%>
+    <h4><%= h(note['label']) %></h4>
+<%- end -%>
+    <%= render_note_body(note) %>
+  </div>
+<%- end -%>
+</section>
+<%- else -%>
+<div class="fa-item" style="--depth: <%= depth(record) %>"<%= record['ref_id'] ? %( id="#{h(record['ref_id'])}") : '' %>>
+  <div class="item-id"><%= h(container_id(record)) %></div>
+  <div class="item-body">
+    <span class="item-title"><%= display_title(record) %></span>
+<%- ordered_notes(record).each do |note| -%>
+    <div class="item-note"><%= render_note_body(note) %></div>
+<%- end -%>
+  </div>
+  <div class="item-date"><%= h(unit_dates(record)) %></div>
+</div>
+<%- end -%>

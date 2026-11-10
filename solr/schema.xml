@@ -163,6 +163,10 @@
     <dynamicField name="*_u_sortdate" type="date" indexed="true" stored="false" multiValued="false" />
     <dynamicField name="*_u_ssortdate" type="date" indexed="true" stored="true" multiValued="false" />
     <dynamicField name="*_int_sort" type="int" indexed="true" stored="false" multiValued="false" />
+
+    <field name="moma_findingaid_doctype" type="string" indexed="true" stored="true" multiValued="false" />
+    <field name="moma_findingaid_collection" type="string" indexed="true" stored="true" multiValued="false" />
+    <field name="moma_findingaid_html" type="string" indexed="false" stored="true" multiValued="false" />
   </fields>
   <uniqueKey>id</uniqueKey>
   <types>
