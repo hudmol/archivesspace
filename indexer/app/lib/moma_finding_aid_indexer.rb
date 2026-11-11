@@ -60,7 +60,7 @@ class MOMAFindingAidIndexer
         total_update_count = 0
 
         lock = Mutex.new
-        work_queue = all_ids.each_slice(250).to_a.reverse
+        work_queue = all_ids.each_slice(100).to_a.reverse
         thread_count = 4
         worker_error = nil
 
@@ -76,6 +76,7 @@ class MOMAFindingAidIndexer
                 ids = lock.synchronize { work_queue.pop }
                 break if ids.nil?
 
+                solr_updates = []
                 records = JSONModel(record_type).all(:id_set => ids.join(","), 'resolve[]' => @client.resolved_attributes)
                 records.each do |record|
                   if !repository.publish
@@ -84,12 +85,15 @@ class MOMAFindingAidIndexer
                   end
 
                   collection_uri = extract_collection_uri(record)
-                  index_record_as_fragment(record, collection_uri)
+
+                  index_record_as_fragment(record, collection_uri, solr_updates)
 
                   lock.synchronize do
                     collections_processed << collection_uri
                   end
                 end
+
+                solr_update(*solr_updates)
 
                 lock.synchronize do
                   updates_since_last_commit += ids.length
@@ -145,8 +149,10 @@ class MOMAFindingAidIndexer
           if deleted_uri =~ /resources/
             did_something = true
 
-            solr_update(delete: {
-                          query: "{!terms f=moma_findingaid_collection}" + deleted_uri,
+            solr_update({
+                          delete: {
+                            query: "{!terms f=moma_findingaid_collection}" + deleted_uri,
+                          }
                         })
           end
         end
@@ -206,19 +212,19 @@ class MOMAFindingAidIndexer
     json
   end
 
-  def index_record_as_fragment(aspace_record, collection_uri)
+  def index_record_as_fragment(aspace_record, collection_uri, solr_updates)
     update = {}
 
     if aspace_record.publish
       json = clean_for_mapping(aspace_record.to_hash(:trusted))
 
       html = if aspace_record.jsonmodel_type == 'resource'
-        @renderer.render_resource(json)
-      elsif aspace_record.jsonmodel_type == 'archival_object'
-        @renderer.render_archival_object(json)
-      else
-        raise log("Don't know how to render a record of type: #{aspace_record.jsonmodel_type}")
-      end
+               @renderer.render_resource(json)
+             elsif aspace_record.jsonmodel_type == 'archival_object'
+               @renderer.render_archival_object(json)
+             else
+               raise log("Don't know how to render a record of type: #{aspace_record.jsonmodel_type}")
+             end
 
       # display_string = aspace_record.jsonmodel_type == 'resource' ? aspace_record.title : aspace_record.display_string
       #
@@ -238,17 +244,25 @@ class MOMAFindingAidIndexer
       }
     end
 
-    solr_update(update)
+    solr_updates << update
   end
 
-  def solr_update(update_spec)
+  def spec_to_solr_syntax(spec)
+    result = ASUtils.to_json(spec)
+    result.gsub!(/^{/, '')
+    result.gsub!(/}$/, '')
+    result
+  end
+
+  def solr_update(*update_specs)
     url = @client.solr_url
     url.path += '/update'
     url.query = 'commit=false'
 
     req = Net::HTTP::Post.new(url)
     req['Content-Type'] = 'application/json'
-    req.body = ASUtils.to_json(update_spec)
+
+    req.body = "{" + update_specs.map {|spec| spec_to_solr_syntax(spec)}.join(',') + "}"
 
     response = @client.do_http_request(url, req)
 
@@ -353,9 +367,13 @@ class MOMAFindingAidIndexer
 
       # Unpublished/suppressed collection record will do this
       if ordered.fetch('uris').empty?
-        solr_update(delete: {
-                      query: "{!terms f=moma_findingaid_collection}" + collection_uri,
-                    })
+        solr_update(
+          {
+            delete: {
+              query: "{!terms f=moma_findingaid_collection}" + collection_uri,
+            }
+          }
+        )
 
         @client.send_commit
 
@@ -398,12 +416,14 @@ class MOMAFindingAidIndexer
 
       if found_all_fragments
         findingaid_id = build_solr_id('findingaid', collection_id)
-        solr_update(add: {
-                      doc: {
-                        :id => findingaid_id,
-                        :moma_findingaid_doctype => 'findingaid',
-                        :moma_findingaid_html => compressed_full_finding_aid,
-                        :moma_findingaid_collection => collection_uri
+        solr_update({
+                      add: {
+                        doc: {
+                          :id => findingaid_id,
+                          :moma_findingaid_doctype => 'findingaid',
+                          :moma_findingaid_html => compressed_full_finding_aid,
+                          :moma_findingaid_collection => collection_uri
+                        }
                       }
                     })
 
@@ -416,7 +436,7 @@ class MOMAFindingAidIndexer
       # Locate any fragments that are no longer used by this collection
       needs_commit = false
       fetch_solr_docs_by_field('moma_findingaid_collection', [collection_uri], {
-                                 rows: 2 ** 31 - 1,
+                                 rows: java.lang.Integer::MAX_VALUE,
                                  return_fields: ['id', 'moma_findingaid_doctype']})
         .each do |doc|
         next unless doc.fetch('moma_findingaid_doctype') == 'fragment'
@@ -426,8 +446,10 @@ class MOMAFindingAidIndexer
           log("Dropping abandoned fragment: #{fragment_id} for collection #{collection_uri}")
 
           needs_commit = true
-          solr_update(delete: {
-                        query: "{!terms f=id}" + fragment_id,
+          solr_update({
+                        delete: {
+                          query: "{!terms f=id}" + fragment_id,
+                        }
                       })
         end
       end
