@@ -78,6 +78,11 @@ class MOMAFindingAidIndexer
 
                 records = JSONModel(record_type).all(:id_set => ids.join(","), 'resolve[]' => @client.resolved_attributes)
                 records.each do |record|
+                  if !repository.publish
+                    # Treat the record as unpublished if its repository is.
+                    record.publish = false
+                  end
+
                   collection_uri = extract_collection_uri(record)
                   index_record_as_fragment(record, collection_uri)
 
@@ -120,7 +125,7 @@ class MOMAFindingAidIndexer
         end
       end
 
-      if generate_finding_aids(collections_processed)
+      if generate_finding_aids(collections_processed, repository.publish)
         INDEXED_RECORD_TYPES.each do |record_type|
           @state.set_last_mtime(repository.id, record_type, start)
         end
@@ -331,13 +336,18 @@ class MOMAFindingAidIndexer
   end
 
 
-  def generate_finding_aids(collection_uris_to_generate)
+  def generate_finding_aids(collection_uris_to_generate, repository_is_published)
     all_successful = true
 
     collection_uris_to_generate.each do |collection_uri|
       found_all_fragments = true
 
-      ordered = JSONModel::HTTP.get_json(collection_uri + "/ordered_records")
+      ordered = if repository_is_published
+                  JSONModel::HTTP.get_json(collection_uri + "/ordered_records")
+                else
+                  # Fake response to treat everything as unpublished
+                  {'uris' => []}
+                end
 
       collection_id = JSONModel.parse_reference(collection_uri).fetch(:id)
 
