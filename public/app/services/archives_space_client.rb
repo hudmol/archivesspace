@@ -97,6 +97,20 @@ class ArchivesSpaceClient
     results.first
   end
 
+  def get_finding_aid(resource_id)
+    finding_aid_id = "findingaid_resource_#{resource_id}"
+
+    url = build_url('/search', { 'q' => "id:#{finding_aid_id}", 'page' => 1, 'page_size' => 1 })
+    results = do_search(url)
+
+
+    if results.fetch('results', []).empty?
+      raise RecordNotFound.new
+    end
+
+    results.fetch('results').fetch(0)
+  end
+
   def search_repository( base, repo_id, page = 1, search_opts = {})
     search_opts = DEFAULT_SEARCH_OPTS.merge(search_opts)
 

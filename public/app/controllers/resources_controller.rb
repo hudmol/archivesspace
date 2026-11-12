@@ -152,19 +152,21 @@ class ResourcesController < ApplicationController
 
       @result =  archivesspace.get_record(uri, @criteria)
 
-      static_identifier = @result.uri.gsub('/', '_')
+      finding_aid_record =
+        begin
+         archivesspace.get_finding_aid(params[:id])
+        rescue RecordNotFound
+          raise "No MOMA canned resource found for ID: #{params[:id]}"
+        end
 
-      if (stream_resource = java.lang.Thread.current_thread.context_class_loader.get_resource_as_stream("#{static_identifier}.html"))
-        content = stream_resource.to_io.read
+      encoded = finding_aid_record.fetch('moma_findingaid_html')
+      compressed = Base64.strict_decode64(encoded)
+
+      content = Zlib::GzipReader.wrap(StringIO.new(compressed)) do |gzip|
+        gzip.read.force_encoding(Encoding::UTF_8)
       end
 
-      content ||= File.read(Rails.public_path.join("#{static_identifier}.html")) rescue nil
-
-      if content.nil?
-        raise "No MOMA canned resource found for ID: #{static_identifier}"
-      end
-
-      @content = content.split(%r{</?body>}).fetch(1)
+      @content = content
       @content.gsub!(%r{<h1.*</h1>}, '')
 
       @repo_info = @result.repository_information

@@ -235,7 +235,9 @@ class MOMAFindingAidIndexer
           :id => build_solr_id(aspace_record.jsonmodel_type, aspace_record.id),
           :moma_findingaid_doctype => 'fragment',
           :moma_findingaid_html => compress(html),
-          :moma_findingaid_collection => collection_uri
+          :moma_findingaid_collection => collection_uri,
+          :types => ['pui', 'moma_findingaid_fragment'],
+          :publish => true,
         }
       }
     else
@@ -422,7 +424,9 @@ class MOMAFindingAidIndexer
                           :id => findingaid_id,
                           :moma_findingaid_doctype => 'findingaid',
                           :moma_findingaid_html => compressed_full_finding_aid,
-                          :moma_findingaid_collection => collection_uri
+                          :moma_findingaid_collection => collection_uri,
+                          :types => ['pui', 'moma_findingaid'],
+                          :publish => true,
                         }
                       }
                     })
