@@ -77,19 +77,21 @@ module FindingAid
     # --- block-level note content ------------------------------------------
 
     # A note_text content string -> one or more <p> blocks. Blank lines start a
-    # new paragraph; single newlines become <br>. A CALS <table> is converted
-    # to an HTML table instead of being paragraphed.
+    # new paragraph; single newlines become <br>. CALS tables are converted
+    # separately so they remain block-level elements in their original order.
     def note_to_html(content)
       return '' if content.nil?
 
-      c = content.to_s
-      return cals_to_html(c) if c.strip.start_with?('<table')
-
-      c.split(/\n[ \t]*\n/)
-       .map(&:strip)
-       .reject(&:empty?)
-       .map { |para| "<p>#{ead_inline(para).gsub(/\n[ \t]*/, '<br>')}</p>" }
-       .join("\n")
+      content.to_s.split(%r{(<table\b[^>]*>.*?</table\s*>)}m).flat_map do |part|
+        if part.match?(%r{\A<table\b[^>]*>.*?</table\s*>\z}m)
+          [cals_to_html(part)]
+        else
+          part.split(/\n[ \t]*\n/)
+              .map(&:strip)
+              .reject(&:empty?)
+              .map { |para| "<p>#{ead_inline(para).gsub(/\n[ \t]*/, '<br>')}</p>" }
+        end
+      end.join("\n")
     end
 
     # Convert an EAD/CALS <table> (tgroup/row/entry) to a plain HTML table.
