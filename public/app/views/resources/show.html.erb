@@ -18,6 +18,71 @@
     <%= render partial: 'shared/breadcrumbs' %>
 </div>
 
-<%== @content %>
+<div class="finding-aid-wrapper">
+  <section class="finding-aid-nav">
+    <div><label><input type="checkbox" id="toggle-do" /> Show Only Digital Material</label></div>
+    <div class="finding-aid-nav-inner"></div>
+  </section>
+  <main class="finding-aid">
+    <%== @content %>
+  </main>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    const applyHashHighlight = () => {
+      if (window.location.hash) {
+        var id = window.location.hash.substring(1);
+        var el = document.getElementById(id);
+        if (el) {
+          el.classList.add('highlight');
+          el.scrollIntoView();
+        }
+      }
+    }
+
+    applyHashHighlight();
+
+    window.addEventListener('hashchange', function() {
+      document.querySelectorAll('.highlight').forEach(function(el) {
+        el.classList.remove('highlight');
+      });
+      applyHashHighlight();
+    });
+
+
+    const nav = document.querySelector('.finding-aid-nav-inner');
+
+    document.querySelectorAll('.finding-aid-wrapper section').forEach(section => {
+      const heading = section.querySelector('h1, h2, h3, h4, h5, h6');
+      if (!heading) {
+        return;
+      }
+      const level = parseInt(heading.tagName.substring(1), 10);
+
+      const link = document.createElement('a');
+
+      if (!section.id) {
+        section.id = 'gensec_' + Math.trunc(Math.random() * 1000000);
+      } else {
+        link.classList.add('moma-lh-nav-item');
+      }
+
+      link.href = '#' + section.id;
+      link.textContent = heading.textContent.trim();
+      link.style.display = 'block';
+      link.style.marginLeft = (level - 1) + 'em';
+
+      if (section.classList.contains('moma-has-do')) {
+        link.classList.add('moma-has-do');
+      }
+      nav.appendChild(link);
+    });
+  });
+</script>
+
+<div class="back-to-top">
+  <button>Back to top</button>
+</div>
 
 <%= render partial: 'shared/modal_actions' %>
