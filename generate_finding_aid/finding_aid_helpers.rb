@@ -29,7 +29,7 @@ module FindingAid
 
     # HTML tags we are willing to emit from EAD content. Anything else that
     # survives translation (stray EAD elements, etc.) is stripped.
-    INLINE_ALLOWED = %w[cite strong em u b i br a span sup sub].freeze
+    INLINE_ALLOWED = %w[cite strong em u b i br a span sup sub div ul li].freeze
 
     # Translate EAD inline markup (already XML-escaped) into HTML.
     def ead_inline(text)
@@ -39,6 +39,9 @@ module FindingAid
 
       # <lb/> -> line break
       s = s.gsub(%r{<lb\b[^>]*/?>}, '<br>')
+
+      # <bibref><emph>Heading</emph>[item] [item]</bibref> -> heading + list
+      s = s.gsub(%r{<bibref\b[^>]*>(.*?)</bibref>}m) { bibref_html(Regexp.last_match(1)) }
 
       # <title ...>...</title> -> <cite> (film / book titles, etc.)
       s = s.gsub(%r{<title\b[^>]*>(.*?)</title>}m) { "<cite>#{Regexp.last_match(1)}</cite>" }
@@ -60,6 +63,21 @@ module FindingAid
         name = m[2].downcase.sub(/\A.*:/, '')
         INLINE_ALLOWED.include?(name) ? m[0] : ''
       end
+    end
+
+    # The leading <emph> is the heading; each [bracketed] chunk is a list item.
+    # Content without a heading or brackets is passed through unchanged.
+    def bibref_html(inner)
+      heading = ''
+      rest = inner
+      if (m = inner.match(%r{\A\s*(<emph\b[^>]*>.*?</emph>)}m))
+        heading = "<span class=\"bibref-heading\">#{m[1].strip}</span>"
+        rest = m.post_match
+      end
+      items = rest.scan(/\[(.*?)\]/m).map { |(it)| "<li>#{it.strip}</li>" }
+      return "<div class=\"bibref\">#{heading}#{rest}</div>" if items.empty?
+
+      "<div class=\"bibref\">#{heading}<ul>#{items.join}</ul></div>"
     end
 
     def emph_tags(render)
