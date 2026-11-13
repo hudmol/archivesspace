@@ -30,10 +30,10 @@
     <h4><%= h(note['label']) %></h4>
 <%- end -%>
     <%= render_note_body(note) %>
-    <%- digital_instances(record).each do |di| -%>
-      <div><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
-    <%- end -%>
   </div>
+<%- end -%>
+<%- digital_instances(record).each do |di| -%>
+  <div class="fa-do"><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
 <%- end -%>
 </section>
 <%- else -%>
@@ -45,7 +45,7 @@
     <div class="item-note"><%= render_note_body(note) %></div>
 <%- end -%>
 <%- digital_instances(record).each do |di| -%>
-    <div><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
+    <div class="fa-do"><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
 <%- end -%>
   </div>
   <div class="item-date"><%= h(unit_dates(record)) %></div>

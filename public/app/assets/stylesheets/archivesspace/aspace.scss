@@ -1170,7 +1170,7 @@ span.head {
 }
 
 .finding-aid .fa-series {
-  margin-top: 20px;
+  margin: 36px 0 12px;
 }
 
 .finding-aid .fa-item {
@@ -1184,4 +1184,19 @@ span.head {
 
 .finding-aid .fa-item .item-body {
   flex: 1 1;
+}
+
+.finding-aid dl {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 0.75rem;
+}
+
+.finding-aid dt {
+  flex: 0 0 20%;
+}
+
+.finding-aid dd {
+  flex: 0 0 80%;
+  margin: 0;
 }
