@@ -1134,6 +1134,7 @@ span.head {
     border-right: solid 5px #999;
 }
 
+/* FIXME MOVE TO MOMA PLUGIN? */
 .finding-aid-wrapper {
     display: flex;
     gap: 2em;
@@ -1166,4 +1167,21 @@ span.head {
     bottom: 20px;
     right: 20px;
     z-index: 1000;
+}
+
+.finding-aid .fa-series {
+  margin-top: 20px;
+}
+
+.finding-aid .fa-item {
+  display: flex;
+  gap: 12px;
+}
+
+.finding-aid .fa-item .item-id {
+  flex: 0 100px;
+}
+
+.finding-aid .fa-item .item-body {
+  flex: 1 1;
 }
