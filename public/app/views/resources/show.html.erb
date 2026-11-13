@@ -85,4 +85,30 @@
   <button>Back to top</button>
 </div>
 
+<script>
+  document.querySelector('.back-to-top').addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    const nav = document.querySelector('.finding-aid-nav');
+    if (nav) {
+      nav.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  });
+
+  document.querySelector('#toggle-do').addEventListener('change', (event) => {
+    const showOnlyDigital = event.target.checked;
+    document.body.classList.toggle('show-only-digital', showOnlyDigital);
+  });
+</script>
+
+<style>
+    body.show-only-digital .moma-item,
+    body.show-only-digital .moma-lh-nav-item {
+        display: none !important;
+    }
+    body.show-only-digital .moma-item.moma-has-do,
+    body.show-only-digital .moma-lh-nav-item.moma-has-do {
+        display: block !important;
+    }
+</style>
+
 <%= render partial: 'shared/modal_actions' %>
