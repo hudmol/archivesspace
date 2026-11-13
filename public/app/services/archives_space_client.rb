@@ -98,7 +98,7 @@ class ArchivesSpaceClient
   end
 
   def get_finding_aid(resource_id)
-    finding_aid_id = "findingaid_resource_#{resource_id}"
+    finding_aid_id = "findingaid_findingaid_#{resource_id}"
 
     url = build_url('/search', { 'q' => "id:#{finding_aid_id}", 'page' => 1, 'page_size' => 1 })
     results = do_search(url)
