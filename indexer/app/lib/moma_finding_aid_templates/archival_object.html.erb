@@ -16,7 +16,7 @@
     * item levels (file, item) render as an id / title / date row.
 -%>
 <%- if grouping?(record) -%>
-<section class="fa-series" style="--depth: <%= depth(record) %>"<%= record['ref_id'] ? %( id="#{h(record['ref_id'])}") : '' %>>
+<section class="fa-series moma-item <%= record['has_digital_object'] ? 'moma-has-do' : '' %>" style="--depth: <%= depth(record) %>"<%= record['ref_id'] ? %( id="#{h(record['ref_id'])}") : '' %>>
   <h3 class="series-title">
     <span class="series-name"><%= display_title(record) %></span>
 <%- d = unit_dates(record) -%>
@@ -30,11 +30,14 @@
     <h4><%= h(note['label']) %></h4>
 <%- end -%>
     <%= render_note_body(note) %>
+    <%- digital_instances(record).each do |di| -%>
+      <div><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
+    <%- end -%>
   </div>
 <%- end -%>
 </section>
 <%- else -%>
-<div class="fa-item" style="--depth: <%= depth(record) %>"<%= record['ref_id'] ? %( id="#{h(record['ref_id'])}") : '' %>>
+<div class="fa-item moma-item <%= record['has_digital_object'] ? 'moma-has-do' : '' %>" style="--depth: <%= depth(record) %>"<%= record['ref_id'] ? %( id="#{h(record['ref_id'])}") : '' %>>
   <div class="item-id"><%= h(container_id(record)) %></div>
   <div class="item-body">
     <span class="item-title"><%= display_title(record) %></span>
@@ -43,5 +46,8 @@
 <%- end -%>
   </div>
   <div class="item-date"><%= h(unit_dates(record)) %></div>
+<%- digital_instances(record).each do |di| -%>
+  <div><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
+<%- end -%>
 </div>
 <%- end -%>

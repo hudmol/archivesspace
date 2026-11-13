@@ -112,6 +112,8 @@ module FindingAid
       end.join("\n")
     end
 
+
+
     # Convert an EAD/CALS <table> (tgroup/row/entry) to a plain HTML table.
     # Regex-based on purpose: no XML dependency, good enough for finding aids.
     def cals_to_html(xml)
@@ -262,6 +264,21 @@ module FindingAid
 
       sc = inst['sub_container']
       sc['indicator_3'] || sc['indicator_2'] || sc['indicator'] || ''
+    end
+
+    def digital_instances?(record)
+      !digital_instances(record).empty?
+    end
+
+    def digital_instances(record)
+      Array(record['instances'])
+        .select { |i| i.dig('digital_object', '_resolved', 'publish') }
+        .collect do |i|
+          {
+            uri: i['digital_object']['ref'],
+            display_name: i['digital_object']['_resolved']['title']
+          }
+      end
     end
   end
 end
