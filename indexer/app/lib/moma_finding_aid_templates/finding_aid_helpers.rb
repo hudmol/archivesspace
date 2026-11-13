@@ -74,7 +74,7 @@ module FindingAid
         heading = "<span class=\"bibref-heading\">#{m[1].strip}</span>"
         rest = m.post_match
       end
-      items = rest.scan(/\[(.*?)\]/m).map { |(it)| "<li>#{it.strip}</li>" }
+      items = rest.scan(/\[(.*?)\]/m).map { |match| "<li>#{match[0].to_s.strip}</li>" }
       return "<div class=\"bibref\">#{heading}#{rest}</div>" if items.empty?
 
       "<div class=\"bibref\">#{heading}<ul>#{items.join}</ul></div>"
