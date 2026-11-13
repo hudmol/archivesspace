@@ -236,8 +236,7 @@ class MOMAFindingAidIndexer
           :moma_findingaid_doctype => 'fragment',
           :moma_findingaid_html => compress(html),
           :moma_findingaid_collection => collection_uri,
-          :types => ['pui', 'moma_findingaid_fragment'],
-          :publish => true,
+          :types => ['moma_findingaid_fragment'],
         }
       }
     else
