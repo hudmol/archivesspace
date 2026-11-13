@@ -44,10 +44,10 @@
 <%- ordered_notes(record).each do |note| -%>
     <div class="item-note"><%= render_note_body(note) %></div>
 <%- end -%>
+<%- digital_instances(record).each do |di| -%>
+    <div><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
+<%- end -%>
   </div>
   <div class="item-date"><%= h(unit_dates(record)) %></div>
-<%- digital_instances(record).each do |di| -%>
-  <div><a href="<%= h(di[:uri]) %>"><span class="fa fa-file-image-o"></span> <%= h(di[:display_name]) %></a></div>
-<%- end -%>
 </div>
 <%- end -%>
